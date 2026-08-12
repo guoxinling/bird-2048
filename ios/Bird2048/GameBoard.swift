@@ -154,6 +154,20 @@ struct GameBoard: Equatable {
         return true
     }
 
+    @discardableResult
+    mutating func removeTile(row: Int, column: Int) -> Bool {
+        guard row >= 0, row < 4, column >= 0, column < 4 else {
+            return false
+        }
+
+        guard cells[row][column] != 0 else {
+            return false
+        }
+
+        cells[row][column] = 0
+        return true
+    }
+
     private static func mergedLine(_ values: some Sequence<Int>) -> (line: [Int], scoreDelta: Int) {
         let compacted = values.filter { $0 != 0 }
         var merged: [Int] = []

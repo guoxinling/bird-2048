@@ -162,6 +162,40 @@ struct GameBoardTests {
 
         #expect(board.hasWon)
     }
+
+    @Test
+    func removeTileClearsNonEmptyCell() {
+        var board = GameBoard(cells: [
+            [2, 4, 8, 16],
+            [32, 64, 128, 256],
+            [512, 1024, 2, 4],
+            [8, 16, 32, 64]
+        ])
+
+        let removed = board.removeTile(row: 2, column: 1)
+
+        #expect(removed)
+        #expect(board.cells[2][1] == 0)
+    }
+
+    @Test
+    func removeTileRejectsEmptyOrOutOfBoundsCell() {
+        var board = GameBoard(cells: [
+            [2, 0, 8, 16],
+            [32, 64, 128, 256],
+            [512, 1024, 2, 4],
+            [8, 16, 32, 64]
+        ])
+
+        let removedEmpty = board.removeTile(row: 0, column: 1)
+        let removedNegativeRow = board.removeTile(row: -1, column: 0)
+        let removedOutOfBoundsColumn = board.removeTile(row: 0, column: 4)
+
+        #expect(!removedEmpty)
+        #expect(!removedNegativeRow)
+        #expect(!removedOutOfBoundsColumn)
+        #expect(board.cells[0][1] == 0)
+    }
 }
 
 private struct SeededRandom: RandomNumberGenerator {

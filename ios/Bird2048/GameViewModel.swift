@@ -7,6 +7,8 @@ final class GameViewModel {
     private let defaults: UserDefaults
     private(set) var game: GameBoard
     private(set) var highScore: Int
+    private(set) var remainingRevives = 3
+    private(set) var isChoosingReviveTile = false
 
     init(game: GameBoard = GameBoard.newGame(), defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -31,7 +33,7 @@ final class GameViewModel {
     }
 
     var showsStatusOverlay: Bool {
-        hasWon || isGameOver
+        !isChoosingReviveTile && (hasWon || isGameOver)
     }
 
     var statusTitle: String {
@@ -47,6 +49,10 @@ final class GameViewModel {
     }
 
     var statusText: String {
+        if isChoosingReviveTile {
+            return "选择一个方块移除"
+        }
+
         if hasWon {
             return "已达成 2048"
         }
@@ -59,7 +65,7 @@ final class GameViewModel {
     }
 
     func move(direction: Direction) {
-        guard !isGameOver else {
+        guard !isChoosingReviveTile, !isGameOver else {
             return
         }
 
@@ -72,5 +78,32 @@ final class GameViewModel {
 
     func restart() {
         game = GameBoard.newGame()
+        remainingRevives = 3
+        isChoosingReviveTile = false
+    }
+
+    @discardableResult
+    func activateReviveMode() -> Bool {
+        guard isGameOver, remainingRevives > 0 else {
+            return false
+        }
+
+        isChoosingReviveTile = true
+        return true
+    }
+
+    @discardableResult
+    func selectReviveTile(row: Int, column: Int) -> Bool {
+        guard isChoosingReviveTile, remainingRevives > 0 else {
+            return false
+        }
+
+        guard game.removeTile(row: row, column: column) else {
+            return false
+        }
+
+        remainingRevives -= 1
+        isChoosingReviveTile = false
+        return true
     }
 }

@@ -95,6 +95,51 @@ struct GameViewModelTests {
         #expect(viewModel.board == before)
     }
 
+    @Test
+    func startsWithThreeRevivesAvailable() {
+        let viewModel = GameViewModel(defaults: makeDefaults())
+
+        #expect(viewModel.remainingRevives == 3)
+        #expect(!viewModel.isChoosingReviveTile)
+    }
+
+    @Test
+    func activateReviveModeOnlyAfterGameOverWhenRevivesRemain() {
+        let game = GameBoard(cells: [
+            [2, 4, 2, 4],
+            [4, 2, 4, 2],
+            [2, 4, 2, 4],
+            [4, 2, 4, 2]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults())
+
+        let activated = viewModel.activateReviveMode()
+
+        #expect(activated)
+        #expect(viewModel.isChoosingReviveTile)
+        #expect(!viewModel.showsStatusOverlay)
+    }
+
+    @Test
+    func selectingReviveTileRemovesTileAndConsumesRevive() {
+        let game = GameBoard(cells: [
+            [2, 4, 2, 4],
+            [4, 2, 4, 2],
+            [2, 4, 2, 4],
+            [4, 2, 4, 2]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults())
+        _ = viewModel.activateReviveMode()
+
+        let revived = viewModel.selectReviveTile(row: 1, column: 2)
+
+        #expect(revived)
+        #expect(viewModel.board[1][2] == 0)
+        #expect(viewModel.remainingRevives == 2)
+        #expect(!viewModel.isChoosingReviveTile)
+        #expect(!viewModel.isGameOver)
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "Bird2048Tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

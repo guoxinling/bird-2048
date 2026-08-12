@@ -18,12 +18,19 @@ struct ContentView: View {
             }
 
             ZStack {
-                GameBoardView(board: viewModel.board)
+                GameBoardView(
+                    board: viewModel.board,
+                    isChoosingReviveTile: viewModel.isChoosingReviveTile,
+                    selectTile: viewModel.selectReviveTile
+                )
 
                 if viewModel.showsStatusOverlay {
                     StatusOverlay(
                         title: viewModel.statusTitle,
                         score: viewModel.score,
+                        canRevive: viewModel.isGameOver && viewModel.remainingRevives > 0,
+                        remainingRevives: viewModel.remainingRevives,
+                        revive: viewModel.activateReviveMode,
                         restart: viewModel.restart
                     )
                 }
@@ -56,6 +63,9 @@ struct ContentView: View {
 private struct StatusOverlay: View {
     let title: String
     let score: Int
+    let canRevive: Bool
+    let remainingRevives: Int
+    let revive: () -> Bool
     let restart: () -> Void
 
     var body: some View {
@@ -65,8 +75,15 @@ private struct StatusOverlay: View {
             Text("分数 \(score.formatted())")
                 .font(.subheadline)
 
-            Button("再来一次", action: restart)
+            if canRevive {
+                Button("移除一个方块复活 (\(remainingRevives))") {
+                    _ = revive()
+                }
                 .buttonStyle(.borderedProminent)
+            }
+
+            Button("再来一次", action: restart)
+                .buttonStyle(.bordered)
         }
         .foregroundStyle(Color(red: 0.17, green: 0.25, blue: 0.38))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -95,13 +112,21 @@ private struct ScorePill: View {
 
 private struct GameBoardView: View {
     let board: [[Int]]
+    let isChoosingReviveTile: Bool
+    let selectTile: (Int, Int) -> Bool
 
     var body: some View {
         Grid(horizontalSpacing: 10, verticalSpacing: 10) {
             ForEach(0..<4, id: \.self) { row in
                 GridRow {
                     ForEach(0..<4, id: \.self) { column in
-                        TileView(value: board[row][column])
+                        TileView(
+                            value: board[row][column],
+                            isSelectable: isChoosingReviveTile && board[row][column] != 0
+                        )
+                        .onTapGesture {
+                            _ = selectTile(row, column)
+                        }
                     }
                 }
             }
@@ -114,11 +139,18 @@ private struct GameBoardView: View {
 
 private struct TileView: View {
     let value: Int
+    let isSelectable: Bool
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 8)
                 .fill(TileStyle.color(for: value))
+                .overlay {
+                    if isSelectable {
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color(red: 0.29, green: 0.63, blue: 0.55), lineWidth: 3)
+                    }
+                }
 
             if value > 0 {
                 Text("\(value)")
@@ -129,6 +161,7 @@ private struct TileView: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .frame(maxWidth: .infinity)
+        .contentShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
