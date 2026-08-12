@@ -39,22 +39,33 @@ struct ContentView: View {
             }
 
             HStack {
-                Button("重新开始") {
-                    viewModel.restart()
-                }
-                .buttonStyle(.borderedProminent)
+                HStack(spacing: 8) {
+                    Button("重新开始") {
+                        viewModel.restart()
+                    }
+                    .buttonStyle(.borderedProminent)
 
-                Button("撤销") {
-                    _ = viewModel.undo()
+                    Button("撤销") {
+                        _ = viewModel.undo()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!viewModel.canUndo)
                 }
-                .buttonStyle(.bordered)
-                .disabled(!viewModel.canUndo)
 
                 Spacer()
 
-                Text(viewModel.statusText)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .trailing, spacing: 6) {
+                    Toggle("触感", isOn: Binding(
+                        get: { viewModel.isFeedbackEnabled },
+                        set: { viewModel.setFeedbackEnabled($0) }
+                    ))
+                    .font(.caption)
+                    .toggleStyle(.switch)
+
+                    Text(viewModel.statusText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(24)

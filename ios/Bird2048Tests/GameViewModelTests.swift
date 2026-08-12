@@ -14,6 +14,24 @@ struct GameViewModelTests {
     }
 
     @Test
+    func enablesFeedbackByDefault() {
+        let viewModel = GameViewModel(defaults: makeDefaults(), feedback: GameFeedback(record: { _ in }))
+
+        #expect(viewModel.isFeedbackEnabled)
+    }
+
+    @Test
+    func persistsFeedbackSetting() {
+        let defaults = makeDefaults()
+        let viewModel = GameViewModel(defaults: defaults, feedback: GameFeedback(record: { _ in }))
+
+        viewModel.setFeedbackEnabled(false)
+        let restoredViewModel = GameViewModel(defaults: defaults, feedback: GameFeedback(record: { _ in }))
+
+        #expect(!restoredViewModel.isFeedbackEnabled)
+    }
+
+    @Test
     func restoresSavedGameFromStorage() throws {
         let defaults = makeDefaults()
         let savedGame = GameBoard(cells: [
@@ -233,6 +251,23 @@ struct GameViewModelTests {
         viewModel.move(direction: .right)
 
         #expect(recorder.events == [.move])
+    }
+
+    @Test
+    func skipsFeedbackWhenSettingIsDisabled() {
+        let recorder = FeedbackRecorder()
+        let game = GameBoard(cells: [
+            [2, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults(), feedback: recorder.feedback)
+
+        viewModel.setFeedbackEnabled(false)
+        viewModel.move(direction: .right)
+
+        #expect(recorder.events.isEmpty)
     }
 
     @Test

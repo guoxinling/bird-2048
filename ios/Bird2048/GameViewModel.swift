@@ -4,6 +4,7 @@ import Foundation
 final class GameViewModel {
     static let highScoreStorageKey = "highScore"
     static let savedGameStorageKey = "savedGame"
+    static let feedbackEnabledStorageKey = "feedbackEnabled"
 
     private let defaults: UserDefaults
     private let feedback: GameFeedback
@@ -12,6 +13,7 @@ final class GameViewModel {
     private(set) var remainingRevives = 3
     private(set) var isChoosingReviveTile = false
     private(set) var didContinueAfterWin = false
+    private(set) var isFeedbackEnabled: Bool
     private var undoSnapshot: GameSnapshot?
 
     init(game: GameBoard? = nil, defaults: UserDefaults = .standard, feedback: GameFeedback = .live) {
@@ -22,6 +24,7 @@ final class GameViewModel {
         highScore = defaults.integer(forKey: Self.highScoreStorageKey)
         remainingRevives = savedGame?.remainingRevives ?? 3
         didContinueAfterWin = savedGame?.didContinueAfterWin ?? false
+        isFeedbackEnabled = defaults.object(forKey: Self.feedbackEnabledStorageKey) as? Bool ?? true
     }
 
     var board: [[Int]] {
@@ -85,7 +88,7 @@ final class GameViewModel {
         let result = game.play(direction)
         if result.moved {
             undoSnapshot = snapshot
-            feedback.play(.move)
+            playFeedback(.move)
             saveGame()
         }
 
@@ -115,6 +118,11 @@ final class GameViewModel {
         return true
     }
 
+    func setFeedbackEnabled(_ isEnabled: Bool) {
+        isFeedbackEnabled = isEnabled
+        defaults.set(isEnabled, forKey: Self.feedbackEnabledStorageKey)
+    }
+
     @discardableResult
     func activateReviveMode() -> Bool {
         guard isGameOver, remainingRevives > 0 else {
@@ -139,7 +147,7 @@ final class GameViewModel {
         undoSnapshot = snapshot
         remainingRevives -= 1
         isChoosingReviveTile = false
-        feedback.play(.revive)
+        playFeedback(.revive)
         saveGame()
         return true
     }
@@ -190,6 +198,14 @@ final class GameViewModel {
             isChoosingReviveTile: isChoosingReviveTile,
             didContinueAfterWin: didContinueAfterWin
         )
+    }
+
+    private func playFeedback(_ event: GameFeedback.Event) {
+        guard isFeedbackEnabled else {
+            return
+        }
+
+        feedback.play(event)
     }
 
     private static func loadSavedGame(defaults: UserDefaults) -> SavedGame? {
