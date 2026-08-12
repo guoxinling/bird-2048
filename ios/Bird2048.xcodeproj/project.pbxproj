@@ -11,6 +11,7 @@
 		29246D8B55187ECD15F4E311 /* GameBoardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4ACB18EDBFCC8A1D0AC3FFE /* GameBoardTests.swift */; };
 		37F3895A76CF15CED5916E33 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 539DC0C14AF2170D707C2B56 /* ContentView.swift */; };
 		D6B6D3C527A6541171FBB52A /* GameBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E843E6B4FA5D70AD5B6025C0 /* GameBoard.swift */; };
+		E091A3D6BA129E9B3756836C /* GameViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9783221065628C51BFC88DA4 /* GameViewModelTests.swift */; };
 		E9FBDD0812604B69D917F8DB /* GameViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D65593A3397567D8E11B95D6 /* GameViewModel.swift */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +29,7 @@
 		1064767986A42504DE2A595B /* Bird2048Tests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = Bird2048Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		342D06B6A7FDC28D81BE62B1 /* Bird2048App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bird2048App.swift; sourceTree = "<group>"; };
 		539DC0C14AF2170D707C2B56 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		9783221065628C51BFC88DA4 /* GameViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameViewModelTests.swift; sourceTree = "<group>"; };
 		A4ACB18EDBFCC8A1D0AC3FFE /* GameBoardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameBoardTests.swift; sourceTree = "<group>"; };
 		D65593A3397567D8E11B95D6 /* GameViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameViewModel.swift; sourceTree = "<group>"; };
 		E16F61AF6A687D9C5D20D2DE /* Bird2048.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Bird2048.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -53,6 +55,7 @@
 			isa = PBXGroup;
 			children = (
 				A4ACB18EDBFCC8A1D0AC3FFE /* GameBoardTests.swift */,
+				9783221065628C51BFC88DA4 /* GameViewModelTests.swift */,
 				EE839F398F04B2749356F55F /* Info.plist */,
 			);
 			path = Bird2048Tests;
@@ -151,6 +154,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				29246D8B55187ECD15F4E311 /* GameBoardTests.swift in Sources */,
+				E091A3D6BA129E9B3756836C /* GameViewModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

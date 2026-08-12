@@ -2,8 +2,17 @@ import Foundation
 
 @Observable
 final class GameViewModel {
-    private(set) var game = GameBoard.newGame()
-    private(set) var highScore = 0
+    static let highScoreStorageKey = "highScore"
+
+    private let defaults: UserDefaults
+    private(set) var game: GameBoard
+    private(set) var highScore: Int
+
+    init(game: GameBoard = GameBoard.newGame(), defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.game = game
+        highScore = defaults.integer(forKey: Self.highScoreStorageKey)
+    }
 
     var board: [[Int]] {
         game.cells
@@ -27,7 +36,10 @@ final class GameViewModel {
 
     func move(direction: Direction) {
         game.play(direction)
-        highScore = max(highScore, game.score)
+        if game.score > highScore {
+            highScore = game.score
+            defaults.set(highScore, forKey: Self.highScoreStorageKey)
+        }
     }
 
     func restart() {
