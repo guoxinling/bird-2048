@@ -28,8 +28,10 @@ struct ContentView: View {
                     StatusOverlay(
                         title: viewModel.statusTitle,
                         score: viewModel.score,
+                        canContinueAfterWin: viewModel.hasWon && !viewModel.didContinueAfterWin,
                         canRevive: viewModel.isGameOver && viewModel.remainingRevives > 0,
                         remainingRevives: viewModel.remainingRevives,
+                        continueAfterWin: viewModel.continueAfterWin,
                         revive: viewModel.activateReviveMode,
                         restart: viewModel.restart
                     )
@@ -63,8 +65,10 @@ struct ContentView: View {
 private struct StatusOverlay: View {
     let title: String
     let score: Int
+    let canContinueAfterWin: Bool
     let canRevive: Bool
     let remainingRevives: Int
+    let continueAfterWin: () -> Bool
     let revive: () -> Bool
     let restart: () -> Void
 
@@ -74,6 +78,13 @@ private struct StatusOverlay: View {
                 .font(.title2.bold())
             Text("分数 \(score.formatted())")
                 .font(.subheadline)
+
+            if canContinueAfterWin {
+                Button("继续挑战") {
+                    _ = continueAfterWin()
+                }
+                .buttonStyle(.borderedProminent)
+            }
 
             if canRevive {
                 Button("移除一个方块复活 (\(remainingRevives))") {

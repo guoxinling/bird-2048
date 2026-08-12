@@ -36,6 +36,31 @@ struct GameViewModelTests {
     }
 
     @Test
+    func restoresLegacySavedGameWithoutContinueFlag() throws {
+        let defaults = makeDefaults()
+        let legacySavedGame: [String: Any] = [
+            "game": [
+                "cells": [
+                    [2, 4, 8, 16],
+                    [32, 64, 128, 256],
+                    [512, 1024, 2, 4],
+                    [8, 16, 32, 64]
+                ],
+                "score": 4096
+            ],
+            "remainingRevives": 1
+        ]
+        let data = try JSONSerialization.data(withJSONObject: legacySavedGame)
+        defaults.set(data, forKey: GameViewModel.savedGameStorageKey)
+
+        let viewModel = GameViewModel(defaults: defaults)
+
+        #expect(viewModel.score == 4096)
+        #expect(viewModel.remainingRevives == 1)
+        #expect(!viewModel.didContinueAfterWin)
+    }
+
+    @Test
     func persistsHighScoreWhenScoreBeatsStoredValue() {
         let defaults = makeDefaults()
         defaults.set(4, forKey: GameViewModel.highScoreStorageKey)
@@ -118,6 +143,26 @@ struct GameViewModelTests {
         #expect(viewModel.hasWon)
         #expect(viewModel.showsStatusOverlay)
         #expect(viewModel.statusTitle == "达成 2048")
+    }
+
+    @Test
+    func continueAfterWinDismissesWinOverlayAndAllowsMoves() {
+        let game = GameBoard(cells: [
+            [2048, 4, 0, 0],
+            [2, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults(), feedback: GameFeedback(record: { _ in }))
+
+        let continued = viewModel.continueAfterWin()
+        viewModel.move(direction: .right)
+
+        #expect(continued)
+        #expect(viewModel.hasWon)
+        #expect(!viewModel.showsStatusOverlay)
+        #expect(viewModel.statusText == "继续挑战")
+        #expect(viewModel.board != game.cells)
     }
 
     @Test

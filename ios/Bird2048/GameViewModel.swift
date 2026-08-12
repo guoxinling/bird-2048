@@ -11,6 +11,7 @@ final class GameViewModel {
     private(set) var highScore: Int
     private(set) var remainingRevives = 3
     private(set) var isChoosingReviveTile = false
+    private(set) var didContinueAfterWin = false
 
     init(game: GameBoard? = nil, defaults: UserDefaults = .standard, feedback: GameFeedback = .live) {
         self.defaults = defaults
@@ -19,6 +20,7 @@ final class GameViewModel {
         self.game = game ?? savedGame?.game ?? GameBoard.newGame()
         highScore = defaults.integer(forKey: Self.highScoreStorageKey)
         remainingRevives = savedGame?.remainingRevives ?? 3
+        didContinueAfterWin = savedGame?.didContinueAfterWin ?? false
     }
 
     var board: [[Int]] {
@@ -38,7 +40,7 @@ final class GameViewModel {
     }
 
     var showsStatusOverlay: Bool {
-        !isChoosingReviveTile && (hasWon || isGameOver)
+        !isChoosingReviveTile && ((hasWon && !didContinueAfterWin) || isGameOver)
     }
 
     var statusTitle: String {
@@ -59,7 +61,7 @@ final class GameViewModel {
         }
 
         if hasWon {
-            return "已达成 2048"
+            return didContinueAfterWin ? "继续挑战" : "已达成 2048"
         }
 
         if isGameOver {
@@ -90,7 +92,19 @@ final class GameViewModel {
         game = GameBoard.newGame()
         remainingRevives = 3
         isChoosingReviveTile = false
+        didContinueAfterWin = false
         saveGame()
+    }
+
+    @discardableResult
+    func continueAfterWin() -> Bool {
+        guard hasWon, !didContinueAfterWin else {
+            return false
+        }
+
+        didContinueAfterWin = true
+        saveGame()
+        return true
     }
 
     @discardableResult
@@ -120,8 +134,17 @@ final class GameViewModel {
         return true
     }
 
-    static func saveGameForTesting(game: GameBoard, remainingRevives: Int, defaults: UserDefaults) throws {
-        let savedGame = SavedGame(game: game, remainingRevives: remainingRevives)
+    static func saveGameForTesting(
+        game: GameBoard,
+        remainingRevives: Int,
+        didContinueAfterWin: Bool = false,
+        defaults: UserDefaults
+    ) throws {
+        let savedGame = SavedGame(
+            game: game,
+            remainingRevives: remainingRevives,
+            didContinueAfterWin: didContinueAfterWin
+        )
         let data = try JSONEncoder().encode(savedGame)
         defaults.set(data, forKey: Self.savedGameStorageKey)
     }
@@ -142,4 +165,18 @@ final class GameViewModel {
 private struct SavedGame: Codable {
     let game: GameBoard
     let remainingRevives: Int
+    let didContinueAfterWin: Bool
+
+    init(game: GameBoard, remainingRevives: Int, didContinueAfterWin: Bool) {
+        self.game = game
+        self.remainingRevives = remainingRevives
+        self.didContinueAfterWin = didContinueAfterWin
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        game = try container.decode(GameBoard.self, forKey: .game)
+        remainingRevives = try container.decode(Int.self, forKey: .remainingRevives)
+        didContinueAfterWin = try container.decodeIfPresent(Bool.self, forKey: .didContinueAfterWin) ?? false
+    }
 }
