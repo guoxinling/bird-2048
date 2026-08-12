@@ -3,6 +3,7 @@ import Foundation
 @Observable
 final class GameViewModel {
     static let highScoreStorageKey = "highScore"
+    static let savedGameStorageKey = "savedGame"
 
     private let defaults: UserDefaults
     private let feedback: GameFeedback
@@ -11,11 +12,13 @@ final class GameViewModel {
     private(set) var remainingRevives = 3
     private(set) var isChoosingReviveTile = false
 
-    init(game: GameBoard = GameBoard.newGame(), defaults: UserDefaults = .standard, feedback: GameFeedback = .live) {
+    init(game: GameBoard? = nil, defaults: UserDefaults = .standard, feedback: GameFeedback = .live) {
         self.defaults = defaults
         self.feedback = feedback
-        self.game = game
+        let savedGame = Self.loadSavedGame(defaults: defaults)
+        self.game = game ?? savedGame?.game ?? GameBoard.newGame()
         highScore = defaults.integer(forKey: Self.highScoreStorageKey)
+        remainingRevives = savedGame?.remainingRevives ?? 3
     }
 
     var board: [[Int]] {
@@ -74,6 +77,7 @@ final class GameViewModel {
         let result = game.play(direction)
         if result.moved {
             feedback.play(.move)
+            saveGame()
         }
 
         if game.score > highScore {
@@ -86,6 +90,7 @@ final class GameViewModel {
         game = GameBoard.newGame()
         remainingRevives = 3
         isChoosingReviveTile = false
+        saveGame()
     }
 
     @discardableResult
@@ -111,6 +116,30 @@ final class GameViewModel {
         remainingRevives -= 1
         isChoosingReviveTile = false
         feedback.play(.revive)
+        saveGame()
         return true
     }
+
+    static func saveGameForTesting(game: GameBoard, remainingRevives: Int, defaults: UserDefaults) throws {
+        let savedGame = SavedGame(game: game, remainingRevives: remainingRevives)
+        let data = try JSONEncoder().encode(savedGame)
+        defaults.set(data, forKey: Self.savedGameStorageKey)
+    }
+
+    private func saveGame() {
+        try? Self.saveGameForTesting(game: game, remainingRevives: remainingRevives, defaults: defaults)
+    }
+
+    private static func loadSavedGame(defaults: UserDefaults) -> SavedGame? {
+        guard let data = defaults.data(forKey: savedGameStorageKey) else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(SavedGame.self, from: data)
+    }
+}
+
+private struct SavedGame: Codable {
+    let game: GameBoard
+    let remainingRevives: Int
 }

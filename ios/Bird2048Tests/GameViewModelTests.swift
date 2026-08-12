@@ -14,6 +14,28 @@ struct GameViewModelTests {
     }
 
     @Test
+    func restoresSavedGameFromStorage() throws {
+        let defaults = makeDefaults()
+        let savedGame = GameBoard(cells: [
+            [2, 4, 8, 16],
+            [32, 64, 128, 256],
+            [512, 1024, 2, 4],
+            [8, 16, 32, 64]
+        ], score: 4096)
+        try GameViewModel.saveGameForTesting(
+            game: savedGame,
+            remainingRevives: 1,
+            defaults: defaults
+        )
+
+        let viewModel = GameViewModel(defaults: defaults)
+
+        #expect(viewModel.board == savedGame.cells)
+        #expect(viewModel.score == 4096)
+        #expect(viewModel.remainingRevives == 1)
+    }
+
+    @Test
     func persistsHighScoreWhenScoreBeatsStoredValue() {
         let defaults = makeDefaults()
         defaults.set(4, forKey: GameViewModel.highScoreStorageKey)
@@ -29,6 +51,25 @@ struct GameViewModelTests {
 
         #expect(viewModel.highScore == 16)
         #expect(defaults.integer(forKey: GameViewModel.highScoreStorageKey) == 16)
+    }
+
+    @Test
+    func persistsGameAfterEffectiveMove() {
+        let defaults = makeDefaults()
+        let game = GameBoard(cells: [
+            [8, 8, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: defaults, feedback: GameFeedback(record: { _ in }))
+
+        viewModel.move(direction: .left)
+        let restoredViewModel = GameViewModel(defaults: defaults, feedback: GameFeedback(record: { _ in }))
+
+        #expect(restoredViewModel.score == viewModel.score)
+        #expect(restoredViewModel.board == viewModel.board)
+        #expect(restoredViewModel.remainingRevives == viewModel.remainingRevives)
     }
 
     @Test
@@ -155,6 +196,25 @@ struct GameViewModelTests {
         #expect(viewModel.remainingRevives == 2)
         #expect(!viewModel.isChoosingReviveTile)
         #expect(!viewModel.isGameOver)
+    }
+
+    @Test
+    func persistsGameAfterSuccessfulReviveSelection() {
+        let defaults = makeDefaults()
+        let game = GameBoard(cells: [
+            [2, 4, 2, 4],
+            [4, 2, 4, 2],
+            [2, 4, 2, 4],
+            [4, 2, 4, 2]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: defaults, feedback: GameFeedback(record: { _ in }))
+        _ = viewModel.activateReviveMode()
+        _ = viewModel.selectReviveTile(row: 1, column: 2)
+
+        let restoredViewModel = GameViewModel(defaults: defaults, feedback: GameFeedback(record: { _ in }))
+
+        #expect(restoredViewModel.board == viewModel.board)
+        #expect(restoredViewModel.remainingRevives == 2)
     }
 
     @Test

@@ -12,7 +12,7 @@ struct MoveResult: Equatable {
     let scoreDelta: Int
 }
 
-struct GameBoard: Equatable {
+struct GameBoard: Codable, Equatable {
     private(set) var cells: [[Int]]
     private(set) var score: Int
 
