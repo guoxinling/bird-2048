@@ -17,7 +17,17 @@ struct ContentView: View {
                 }
             }
 
-            GameBoardView(board: viewModel.board)
+            ZStack {
+                GameBoardView(board: viewModel.board)
+
+                if viewModel.showsStatusOverlay {
+                    StatusOverlay(
+                        title: viewModel.statusTitle,
+                        score: viewModel.score,
+                        restart: viewModel.restart
+                    )
+                }
+            }
 
             HStack {
                 Button("重新开始") {
@@ -40,6 +50,28 @@ struct ContentView: View {
                     viewModel.move(direction: Direction.fromDrag(value.translation))
                 }
         )
+    }
+}
+
+private struct StatusOverlay: View {
+    let title: String
+    let score: Int
+    let restart: () -> Void
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Text(title)
+                .font(.title2.bold())
+            Text("分数 \(score.formatted())")
+                .font(.subheadline)
+
+            Button("再来一次", action: restart)
+                .buttonStyle(.borderedProminent)
+        }
+        .foregroundStyle(Color(red: 0.17, green: 0.25, blue: 0.38))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 

@@ -22,12 +22,36 @@ final class GameViewModel {
         game.score
     }
 
+    var hasWon: Bool {
+        game.hasWon
+    }
+
+    var isGameOver: Bool {
+        game.isGameOver
+    }
+
+    var showsStatusOverlay: Bool {
+        hasWon || isGameOver
+    }
+
+    var statusTitle: String {
+        if hasWon {
+            return "达成 2048"
+        }
+
+        if isGameOver {
+            return "游戏结束"
+        }
+
+        return ""
+    }
+
     var statusText: String {
-        if game.hasWon {
+        if hasWon {
             return "已达成 2048"
         }
 
-        if game.isGameOver {
+        if isGameOver {
             return "游戏结束"
         }
 
@@ -35,6 +59,10 @@ final class GameViewModel {
     }
 
     func move(direction: Direction) {
+        guard !isGameOver else {
+            return
+        }
+
         game.play(direction)
         if game.score > highScore {
             highScore = game.score

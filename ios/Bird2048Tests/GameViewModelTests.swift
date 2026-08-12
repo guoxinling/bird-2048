@@ -49,6 +49,52 @@ struct GameViewModelTests {
         #expect(defaults.integer(forKey: GameViewModel.highScoreStorageKey) == 64)
     }
 
+    @Test
+    func exposesGameOverStateForBlockingUi() {
+        let game = GameBoard(cells: [
+            [2, 4, 2, 4],
+            [4, 2, 4, 2],
+            [2, 4, 2, 4],
+            [4, 2, 4, 2]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults())
+
+        #expect(viewModel.isGameOver)
+        #expect(viewModel.showsStatusOverlay)
+        #expect(viewModel.statusTitle == "游戏结束")
+    }
+
+    @Test
+    func exposesWinStateForStatusUi() {
+        let game = GameBoard(cells: [
+            [2048, 4, 2, 4],
+            [4, 2, 4, 2],
+            [2, 4, 2, 4],
+            [4, 2, 4, 2]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults())
+
+        #expect(viewModel.hasWon)
+        #expect(viewModel.showsStatusOverlay)
+        #expect(viewModel.statusTitle == "达成 2048")
+    }
+
+    @Test
+    func ignoresMoveAfterGameOver() {
+        let game = GameBoard(cells: [
+            [2, 4, 2, 4],
+            [4, 2, 4, 2],
+            [2, 4, 2, 4],
+            [4, 2, 4, 2]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults())
+        let before = viewModel.board
+
+        viewModel.move(direction: .left)
+
+        #expect(viewModel.board == before)
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "Bird2048Tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
