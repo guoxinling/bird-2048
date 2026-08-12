@@ -1,0 +1,401 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0A12F9D29A346C5D5976849E /* Bird2048App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 342D06B6A7FDC28D81BE62B1 /* Bird2048App.swift */; };
+		29246D8B55187ECD15F4E311 /* GameBoardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4ACB18EDBFCC8A1D0AC3FFE /* GameBoardTests.swift */; };
+		37F3895A76CF15CED5916E33 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 539DC0C14AF2170D707C2B56 /* ContentView.swift */; };
+		D6B6D3C527A6541171FBB52A /* GameBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E843E6B4FA5D70AD5B6025C0 /* GameBoard.swift */; };
+		E9FBDD0812604B69D917F8DB /* GameViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D65593A3397567D8E11B95D6 /* GameViewModel.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		51097EA8C61684DA2A02F097 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0F2139B8AACFF179D3C26D1A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 37C756D4D8B480CD2CE3970D;
+			remoteInfo = Bird2048;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		1064767986A42504DE2A595B /* Bird2048Tests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = Bird2048Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		342D06B6A7FDC28D81BE62B1 /* Bird2048App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bird2048App.swift; sourceTree = "<group>"; };
+		539DC0C14AF2170D707C2B56 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A4ACB18EDBFCC8A1D0AC3FFE /* GameBoardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameBoardTests.swift; sourceTree = "<group>"; };
+		D65593A3397567D8E11B95D6 /* GameViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameViewModel.swift; sourceTree = "<group>"; };
+		E16F61AF6A687D9C5D20D2DE /* Bird2048.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Bird2048.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E843E6B4FA5D70AD5B6025C0 /* GameBoard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameBoard.swift; sourceTree = "<group>"; };
+		EE839F398F04B2749356F55F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		FAFF395119C31C8F71989A18 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		12EC1CE080ED75BCB4F8BDBF /* Bird2048 */ = {
+			isa = PBXGroup;
+			children = (
+				342D06B6A7FDC28D81BE62B1 /* Bird2048App.swift */,
+				539DC0C14AF2170D707C2B56 /* ContentView.swift */,
+				E843E6B4FA5D70AD5B6025C0 /* GameBoard.swift */,
+				D65593A3397567D8E11B95D6 /* GameViewModel.swift */,
+				FAFF395119C31C8F71989A18 /* Info.plist */,
+			);
+			path = Bird2048;
+			sourceTree = "<group>";
+		};
+		A661AF5B8E117F3CD88D387C /* Bird2048Tests */ = {
+			isa = PBXGroup;
+			children = (
+				A4ACB18EDBFCC8A1D0AC3FFE /* GameBoardTests.swift */,
+				EE839F398F04B2749356F55F /* Info.plist */,
+			);
+			path = Bird2048Tests;
+			sourceTree = "<group>";
+		};
+		D846269D850D9AFD3EA3898D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E16F61AF6A687D9C5D20D2DE /* Bird2048.app */,
+				1064767986A42504DE2A595B /* Bird2048Tests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		E643A714E10BBD3C32079DB9 = {
+			isa = PBXGroup;
+			children = (
+				12EC1CE080ED75BCB4F8BDBF /* Bird2048 */,
+				A661AF5B8E117F3CD88D387C /* Bird2048Tests */,
+				D846269D850D9AFD3EA3898D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		31F27DA5D07A4C4E26709653 /* Bird2048Tests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 34847B7E49522E6055DAC371 /* Build configuration list for PBXNativeTarget "Bird2048Tests" */;
+			buildPhases = (
+				20A8A1997C1233B906AA0B8A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E42091B4BCB5EE2B8D368490 /* PBXTargetDependency */,
+			);
+			name = Bird2048Tests;
+			packageProductDependencies = (
+			);
+			productName = Bird2048Tests;
+			productReference = 1064767986A42504DE2A595B /* Bird2048Tests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		37C756D4D8B480CD2CE3970D /* Bird2048 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 39DF6ACD24EA2E9F235FA9E8 /* Build configuration list for PBXNativeTarget "Bird2048" */;
+			buildPhases = (
+				739502A6D1F7BB46B5C8C374 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Bird2048;
+			packageProductDependencies = (
+			);
+			productName = Bird2048;
+			productReference = E16F61AF6A687D9C5D20D2DE /* Bird2048.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0F2139B8AACFF179D3C26D1A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 100403DE15F20D167BC294F3 /* Build configuration list for PBXProject "Bird2048" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = E643A714E10BBD3C32079DB9;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = D846269D850D9AFD3EA3898D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				37C756D4D8B480CD2CE3970D /* Bird2048 */,
+				31F27DA5D07A4C4E26709653 /* Bird2048Tests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		20A8A1997C1233B906AA0B8A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				29246D8B55187ECD15F4E311 /* GameBoardTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		739502A6D1F7BB46B5C8C374 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0A12F9D29A346C5D5976849E /* Bird2048App.swift in Sources */,
+				37F3895A76CF15CED5916E33 /* ContentView.swift in Sources */,
+				D6B6D3C527A6541171FBB52A /* GameBoard.swift in Sources */,
+				E9FBDD0812604B69D917F8DB /* GameViewModel.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E42091B4BCB5EE2B8D368490 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 37C756D4D8B480CD2CE3970D /* Bird2048 */;
+			targetProxy = 51097EA8C61684DA2A02F097 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		157155015E028D9F00DC54CA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				INFOPLIST_FILE = Bird2048Tests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.guoxinling.bird2048.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Bird2048.app/Bird2048";
+			};
+			name = Debug;
+		};
+		26B4AE18E51BBB2A42CB2FA1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Bird2048/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.guoxinling.bird2048;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8718BA85E783A928562214A1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		8EE121558EB86A2EE1BFCC8E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				INFOPLIST_FILE = Bird2048Tests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.guoxinling.bird2048.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Bird2048.app/Bird2048";
+			};
+			name = Release;
+		};
+		B30F8D757C7E42F47BA5344E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Bird2048/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.guoxinling.bird2048;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		CF78E1B17534FF451D2F53CE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		100403DE15F20D167BC294F3 /* Build configuration list for PBXProject "Bird2048" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8718BA85E783A928562214A1 /* Debug */,
+				CF78E1B17534FF451D2F53CE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		34847B7E49522E6055DAC371 /* Build configuration list for PBXNativeTarget "Bird2048Tests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				157155015E028D9F00DC54CA /* Debug */,
+				8EE121558EB86A2EE1BFCC8E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		39DF6ACD24EA2E9F235FA9E8 /* Build configuration list for PBXNativeTarget "Bird2048" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				26B4AE18E51BBB2A42CB2FA1 /* Debug */,
+				B30F8D757C7E42F47BA5344E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 0F2139B8AACFF179D3C26D1A /* Project object */;
+}
