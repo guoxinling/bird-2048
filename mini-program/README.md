@@ -8,12 +8,24 @@ This is the existing WeChat Mini Game version.
 - `game.json`: Mini Game runtime configuration.
 - `project.config.json`: WeChat Developer Tools project configuration.
 
-## Current Maintenance Priorities
+## Open in WeChat DevTools
 
-1. Fix Canvas clarity by applying device pixel ratio scaling.
-2. Simplify touch event registration.
-3. Clean up audio initialization and debug logging.
-4. Keep platform-specific Mini Game ads and WeChat APIs in this directory.
+Open the `mini-program/` directory (not the repository root).
+
+## Current Status (v1.0.1)
+
+Shipped quality fixes in this tree:
+
+1. Canvas clarity via device pixel ratio scaling.
+2. Single global touch listener set (no nested re-registration).
+3. Non-blocking 2048 win banner; game-over check no longer skipped.
+4. Tile colors for 4096+ with fallback styling.
+5. Leaner audio unlock on first gesture; upload pack ignores backups.
+
+## Next Up
+
+- Rewarded-ad revive (after gameplay stays stable).
+- Optional motion polish (only if product asks for it).
 
 ## Boundary
 
