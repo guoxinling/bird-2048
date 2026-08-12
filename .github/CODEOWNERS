@@ -1,0 +1,11 @@
+# Repository coordination ownership.
+#
+# Replace these placeholders with real GitHub usernames after the remote is
+# created.
+
+/mini-program/  @guoxl
+/ios/           @guoxl
+/shared/        @guoxl
+/README.md      @guoxl
+/.gitignore     @guoxl
+/.github/       @guoxl

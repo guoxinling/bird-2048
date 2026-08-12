@@ -12,6 +12,13 @@ The Mini Game currently includes:
 
 These can be reused as temporary iOS assets.
 
+Short term, the binary asset source of truth remains under `mini-program/`.
+When iOS needs an asset, copy it into the iOS project and record that usage here.
+Do not edit Mini Game assets as a side effect of iOS work.
+
+If assets later move into `shared/assets/`, update this file first and migrate
+each platform in separate pull requests.
+
 ## iOS Asset Guidance
 
 For iOS production quality:

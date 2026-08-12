@@ -10,6 +10,9 @@ Maintain two platform projects:
 The projects share rules, product notes, audio, and visual direction. They do not
 share runtime UI or platform integration code.
 
+`shared/` is for product rules, notes, and asset guidance. It should not contain
+cross-platform executable game code unless the repository strategy changes.
+
 ## Why Not Use a Game Engine Now
 
 The game is lightweight and already launched as a Mini Game. Migrating to a

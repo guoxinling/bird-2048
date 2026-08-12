@@ -25,3 +25,23 @@ This keeps platform-specific work clean:
 2. Build the iOS version as a native app.
 3. Use `shared/game-rules.md` as the behavioral source of truth.
 4. Add monetization only after each platform has a stable playable version.
+
+## Maintenance Boundaries
+
+- Cursor owns `mini-program/**` and must not submit `ios/**` changes unless
+  explicitly authorized.
+- Codex owns `ios/**` and `shared/**` and must not submit `mini-program/**`
+  changes unless explicitly asked to fix the Mini Game.
+- `shared/**`, `README.md`, and `.gitignore` are coordination files. Changes
+  should be called out in the conversation and kept in focused commits.
+- Runtime code is not shared between platforms. Shared behavior belongs in
+  `shared/game-rules.md`.
+
+## Branches and Pull Requests
+
+- Use `main` as the stable branch.
+- Prefer short-lived feature branches such as `cursor/fix-mini-program-dpr`,
+  `cursor/feat-mini-program-ads`, `codex/feat-ios-initial-app`, and
+  `codex/docs-shared-rules`.
+- Pull request titles should start with `mp:`, `ios:`, or `shared:`.
+- Avoid direct pushes to `main` after the GitHub remote is created.
