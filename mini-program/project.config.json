@@ -3,7 +3,24 @@
   "compileType": "game",
   "libVersion": "2.25.3",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "value": "game.js.backup",
+        "type": "file"
+      },
+      {
+        "value": "backup",
+        "type": "folder"
+      },
+      {
+        "value": "gitee2048.code-workspace",
+        "type": "file"
+      },
+      {
+        "value": ".cloudbase",
+        "type": "folder"
+      }
+    ],
     "include": []
   },
   "setting": {
@@ -20,11 +37,24 @@
       "disablePlugins": [],
       "outputPath": ""
     },
-    "uglifyFileName": false
+    "uglifyFileName": false,
+    "compileWorklet": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true
   },
   "condition": {},
   "editorSetting": {
     "tabIndent": "insertSpaces",
     "tabSize": 2
-  }
+  },
+  "simulatorPluginLibVersion": {},
+  "isGameTourist": false
 }
