@@ -41,6 +41,12 @@ struct GameBoard: Equatable {
         cells.contains { row in row.contains(2048) }
     }
 
+    var nonEmptyTileCount: Int {
+        cells.reduce(0) { count, row in
+            count + row.filter { $0 != 0 }.count
+        }
+    }
+
     var isGameOver: Bool {
         if cells.contains(where: { row in row.contains(0) }) {
             return false
@@ -104,6 +110,21 @@ struct GameBoard: Equatable {
         }
 
         return MoveResult(moved: moved, scoreDelta: moved ? scoreDelta : 0)
+    }
+
+    @discardableResult
+    mutating func play(_ direction: Direction, random: inout some RandomNumberGenerator) -> MoveResult {
+        let result = move(direction)
+        if result.moved {
+            addRandomTile(random: &random)
+        }
+        return result
+    }
+
+    @discardableResult
+    mutating func play(_ direction: Direction) -> MoveResult {
+        var random = SystemRandomNumberGenerator()
+        return play(direction, random: &random)
     }
 
     @discardableResult

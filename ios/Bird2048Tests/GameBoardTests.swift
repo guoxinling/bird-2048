@@ -99,6 +99,40 @@ struct GameBoardTests {
     }
 
     @Test
+    func playAddsOneTileAfterValidMove() {
+        var board = GameBoard(cells: [
+            [2, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+        ])
+        var random = SeededRandom(seed: 1)
+
+        let result = board.play(.right, random: &random)
+
+        #expect(result.moved)
+        #expect(board.nonEmptyTileCount == 2)
+        #expect(board.cells[0][3] == 2)
+    }
+
+    @Test
+    func playDoesNotAddTileAfterInvalidMove() {
+        var board = GameBoard(cells: [
+            [2, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+        ])
+        var random = SeededRandom(seed: 1)
+
+        let result = board.play(.left, random: &random)
+
+        #expect(!result.moved)
+        #expect(board.nonEmptyTileCount == 1)
+        #expect(board.cells[0][0] == 2)
+    }
+
+    @Test
     func detectsGameOverOnlyWhenNoMovesRemain() {
         let gameOverBoard = GameBoard(cells: [
             [2, 4, 2, 4],
@@ -127,5 +161,14 @@ struct GameBoardTests {
         ])
 
         #expect(board.hasWon)
+    }
+}
+
+private struct SeededRandom: RandomNumberGenerator {
+    var seed: UInt64
+
+    mutating func next() -> UInt64 {
+        seed = seed &* 6_364_136_223_846_793_005 &+ 1
+        return seed
     }
 }

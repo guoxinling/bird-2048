@@ -26,7 +26,7 @@ final class GameViewModel {
     }
 
     func move(direction: Direction) {
-        game.move(direction)
+        game.play(direction)
         highScore = max(highScore, game.score)
     }
 
