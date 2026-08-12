@@ -44,6 +44,12 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
 
+                Button("撤销") {
+                    _ = viewModel.undo()
+                }
+                .buttonStyle(.bordered)
+                .disabled(!viewModel.canUndo)
+
                 Spacer()
 
                 Text(viewModel.statusText)

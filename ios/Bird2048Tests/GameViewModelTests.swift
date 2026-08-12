@@ -98,6 +98,25 @@ struct GameViewModelTests {
     }
 
     @Test
+    func undoRestoresBoardBeforeEffectiveMove() {
+        let game = GameBoard(cells: [
+            [8, 8, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+        ], score: 32)
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults(), feedback: GameFeedback(record: { _ in }))
+
+        viewModel.move(direction: .left)
+        let undone = viewModel.undo()
+
+        #expect(undone)
+        #expect(viewModel.board == game.cells)
+        #expect(viewModel.score == 32)
+        #expect(!viewModel.canUndo)
+    }
+
+    @Test
     func keepsStoredHighScoreWhenCurrentScoreIsLower() {
         let defaults = makeDefaults()
         defaults.set(64, forKey: GameViewModel.highScoreStorageKey)
@@ -163,6 +182,24 @@ struct GameViewModelTests {
         #expect(!viewModel.showsStatusOverlay)
         #expect(viewModel.statusText == "继续挑战")
         #expect(viewModel.board != game.cells)
+    }
+
+    @Test
+    func persistsContinueAfterWinState() {
+        let defaults = makeDefaults()
+        let game = GameBoard(cells: [
+            [2048, 4, 0, 0],
+            [2, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: defaults, feedback: GameFeedback(record: { _ in }))
+
+        _ = viewModel.continueAfterWin()
+        let restoredViewModel = GameViewModel(defaults: defaults, feedback: GameFeedback(record: { _ in }))
+
+        #expect(restoredViewModel.didContinueAfterWin)
+        #expect(!restoredViewModel.showsStatusOverlay)
     }
 
     @Test
@@ -241,6 +278,44 @@ struct GameViewModelTests {
         #expect(viewModel.remainingRevives == 2)
         #expect(!viewModel.isChoosingReviveTile)
         #expect(!viewModel.isGameOver)
+    }
+
+    @Test
+    func undoRestoresBoardBeforeSuccessfulReviveSelection() {
+        let game = GameBoard(cells: [
+            [2, 4, 2, 4],
+            [4, 2, 4, 2],
+            [2, 4, 2, 4],
+            [4, 2, 4, 2]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults(), feedback: GameFeedback(record: { _ in }))
+
+        _ = viewModel.activateReviveMode()
+        _ = viewModel.selectReviveTile(row: 1, column: 2)
+        let undone = viewModel.undo()
+
+        #expect(undone)
+        #expect(viewModel.board == game.cells)
+        #expect(viewModel.remainingRevives == 3)
+        #expect(!viewModel.canUndo)
+    }
+
+    @Test
+    func restartClearsUndoState() {
+        let game = GameBoard(cells: [
+            [8, 8, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults(), feedback: GameFeedback(record: { _ in }))
+
+        viewModel.move(direction: .left)
+        viewModel.restart()
+        let undone = viewModel.undo()
+
+        #expect(!undone)
+        #expect(!viewModel.canUndo)
     }
 
     @Test

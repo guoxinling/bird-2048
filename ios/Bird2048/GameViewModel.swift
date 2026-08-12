@@ -12,6 +12,7 @@ final class GameViewModel {
     private(set) var remainingRevives = 3
     private(set) var isChoosingReviveTile = false
     private(set) var didContinueAfterWin = false
+    private var undoSnapshot: GameSnapshot?
 
     init(game: GameBoard? = nil, defaults: UserDefaults = .standard, feedback: GameFeedback = .live) {
         self.defaults = defaults
@@ -37,6 +38,10 @@ final class GameViewModel {
 
     var isGameOver: Bool {
         game.isGameOver
+    }
+
+    var canUndo: Bool {
+        undoSnapshot != nil
     }
 
     var showsStatusOverlay: Bool {
@@ -76,8 +81,10 @@ final class GameViewModel {
             return
         }
 
+        let snapshot = makeSnapshot()
         let result = game.play(direction)
         if result.moved {
+            undoSnapshot = snapshot
             feedback.play(.move)
             saveGame()
         }
@@ -93,6 +100,7 @@ final class GameViewModel {
         remainingRevives = 3
         isChoosingReviveTile = false
         didContinueAfterWin = false
+        undoSnapshot = nil
         saveGame()
     }
 
@@ -123,13 +131,30 @@ final class GameViewModel {
             return false
         }
 
+        let snapshot = makeSnapshot()
         guard game.removeTile(row: row, column: column) else {
             return false
         }
 
+        undoSnapshot = snapshot
         remainingRevives -= 1
         isChoosingReviveTile = false
         feedback.play(.revive)
+        saveGame()
+        return true
+    }
+
+    @discardableResult
+    func undo() -> Bool {
+        guard let snapshot = undoSnapshot else {
+            return false
+        }
+
+        game = snapshot.game
+        remainingRevives = snapshot.remainingRevives
+        isChoosingReviveTile = snapshot.isChoosingReviveTile
+        didContinueAfterWin = snapshot.didContinueAfterWin
+        undoSnapshot = nil
         saveGame()
         return true
     }
@@ -150,7 +175,21 @@ final class GameViewModel {
     }
 
     private func saveGame() {
-        try? Self.saveGameForTesting(game: game, remainingRevives: remainingRevives, defaults: defaults)
+        try? Self.saveGameForTesting(
+            game: game,
+            remainingRevives: remainingRevives,
+            didContinueAfterWin: didContinueAfterWin,
+            defaults: defaults
+        )
+    }
+
+    private func makeSnapshot() -> GameSnapshot {
+        GameSnapshot(
+            game: game,
+            remainingRevives: remainingRevives,
+            isChoosingReviveTile: isChoosingReviveTile,
+            didContinueAfterWin: didContinueAfterWin
+        )
     }
 
     private static func loadSavedGame(defaults: UserDefaults) -> SavedGame? {
@@ -160,6 +199,13 @@ final class GameViewModel {
 
         return try? JSONDecoder().decode(SavedGame.self, from: data)
     }
+}
+
+private struct GameSnapshot {
+    let game: GameBoard
+    let remainingRevives: Int
+    let isChoosingReviveTile: Bool
+    let didContinueAfterWin: Bool
 }
 
 private struct SavedGame: Codable {
