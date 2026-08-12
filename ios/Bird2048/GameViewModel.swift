@@ -134,6 +134,16 @@ final class GameViewModel {
     }
 
     @discardableResult
+    func cancelReviveMode() -> Bool {
+        guard isChoosingReviveTile else {
+            return false
+        }
+
+        isChoosingReviveTile = false
+        return true
+    }
+
+    @discardableResult
     func selectReviveTile(row: Int, column: Int) -> Bool {
         guard isChoosingReviveTile, remainingRevives > 0 else {
             return false

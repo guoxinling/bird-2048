@@ -296,6 +296,26 @@ struct GameViewModelTests {
     }
 
     @Test
+    func cancelReviveModeReturnsToGameOverOverlayWithoutConsumingRevive() {
+        let game = GameBoard(cells: [
+            [2, 4, 2, 4],
+            [4, 2, 4, 2],
+            [2, 4, 2, 4],
+            [4, 2, 4, 2]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults())
+
+        _ = viewModel.activateReviveMode()
+        let cancelled = viewModel.cancelReviveMode()
+
+        #expect(cancelled)
+        #expect(!viewModel.isChoosingReviveTile)
+        #expect(viewModel.showsStatusOverlay)
+        #expect(viewModel.remainingRevives == 3)
+        #expect(viewModel.board == game.cells)
+    }
+
+    @Test
     func selectingReviveTileRemovesTileAndConsumesRevive() {
         let game = GameBoard(cells: [
             [2, 4, 2, 4],

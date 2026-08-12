@@ -24,6 +24,18 @@ struct ContentView: View {
                     selectTile: viewModel.selectReviveTile
                 )
 
+                if viewModel.isChoosingReviveTile {
+                    VStack {
+                        Spacer()
+
+                        Button("取消复活") {
+                            _ = viewModel.cancelReviveMode()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.bottom, 18)
+                    }
+                }
+
                 if viewModel.showsStatusOverlay {
                     StatusOverlay(
                         title: viewModel.statusTitle,
