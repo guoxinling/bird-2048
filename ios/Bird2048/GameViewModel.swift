@@ -5,13 +5,15 @@ final class GameViewModel {
     static let highScoreStorageKey = "highScore"
 
     private let defaults: UserDefaults
+    private let feedback: GameFeedback
     private(set) var game: GameBoard
     private(set) var highScore: Int
     private(set) var remainingRevives = 3
     private(set) var isChoosingReviveTile = false
 
-    init(game: GameBoard = GameBoard.newGame(), defaults: UserDefaults = .standard) {
+    init(game: GameBoard = GameBoard.newGame(), defaults: UserDefaults = .standard, feedback: GameFeedback = .live) {
         self.defaults = defaults
+        self.feedback = feedback
         self.game = game
         highScore = defaults.integer(forKey: Self.highScoreStorageKey)
     }
@@ -69,7 +71,11 @@ final class GameViewModel {
             return
         }
 
-        game.play(direction)
+        let result = game.play(direction)
+        if result.moved {
+            feedback.play(.move)
+        }
+
         if game.score > highScore {
             highScore = game.score
             defaults.set(highScore, forKey: Self.highScoreStorageKey)
@@ -104,6 +110,7 @@ final class GameViewModel {
 
         remainingRevives -= 1
         isChoosingReviveTile = false
+        feedback.play(.revive)
         return true
     }
 }

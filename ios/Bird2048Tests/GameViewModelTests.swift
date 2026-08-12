@@ -96,6 +96,23 @@ struct GameViewModelTests {
     }
 
     @Test
+    func playsFeedbackAfterEffectiveMoveOnly() {
+        let recorder = FeedbackRecorder()
+        let game = GameBoard(cells: [
+            [2, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults(), feedback: recorder.feedback)
+
+        viewModel.move(direction: .left)
+        viewModel.move(direction: .right)
+
+        #expect(recorder.events == [.move])
+    }
+
+    @Test
     func startsWithThreeRevivesAvailable() {
         let viewModel = GameViewModel(defaults: makeDefaults())
 
@@ -140,10 +157,47 @@ struct GameViewModelTests {
         #expect(!viewModel.isGameOver)
     }
 
+    @Test
+    func playsFeedbackAfterSuccessfulReviveSelectionOnly() {
+        let recorder = FeedbackRecorder()
+        let game = GameBoard(cells: [
+            [2, 4, 2, 4],
+            [4, 2, 4, 2],
+            [2, 4, 2, 4],
+            [4, 2, 4, 2]
+        ])
+        let viewModel = GameViewModel(game: game, defaults: makeDefaults(), feedback: recorder.feedback)
+
+        _ = viewModel.selectReviveTile(row: 1, column: 2)
+        _ = viewModel.activateReviveMode()
+        _ = viewModel.selectReviveTile(row: 1, column: 2)
+
+        #expect(recorder.events == [.revive])
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "Bird2048Tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
+    }
+}
+
+private final class FeedbackRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedEvents: [GameFeedback.Event] = []
+
+    var feedback: GameFeedback {
+        GameFeedback { [self] event in
+            lock.withLock {
+                recordedEvents.append(event)
+            }
+        }
+    }
+
+    var events: [GameFeedback.Event] {
+        lock.withLock {
+            recordedEvents
+        }
     }
 }
