@@ -1,7 +1,18 @@
 import './js/libs/weapp-adapter'
 import './js/libs/symbol'
 
-const APP_VERSION = '1.0.1'
+const APP_VERSION = '1.1.0'
+
+const MAX_UNDOS = 2
+const MAX_REVIVES = 1
+const MILESTONES = [512, 1024, 2048]
+const SLIDE_MS = 140
+const SPAWN_START_MS = 80
+const SPAWN_MS = 100
+const POP_START_MS = 120
+const POP_MS = 80
+const MOVE_ANIM_MS = 200
+const SCORE_POP_MS = 420
 
 // Canvas + DPR（逻辑坐标绘制，物理像素按像素比放大）
 const canvas = wx.createCanvas()
@@ -64,7 +75,8 @@ const animalTexts = [
   '我是iTab插件的形象大使,你发现了没?',
   'iTab插件是一款非常强大的浏览器插件呢',
   '我是一只能为你带来快乐的小鸟~',
-  '我还不会动，因为我正在学做动画呢~'
+  '点我可以衔回上一步，每局两次哦！',
+  '误滑了别慌，让我帮你把格子衔回来~'
 ]
 
 const THEME_FOREST = {
@@ -126,13 +138,18 @@ let score = 0
 let highScore = 0
 let gameOver = false
 let gameWon = false
-let gameWonDismissed = false
 
 let reviveMode = false
-let canRevive = 3
+let canRevive = MAX_REVIVES
+
+let undoLeft = MAX_UNDOS
+let undoStack = []
+let showAssistPanel = false
+let assistUndoBtn = null
+let assistHintBtn = null
+let reachedMilestones = new Set()
 
 let currentRestartBtn = null
-let winBannerArea = null
 let currentSwipe = { direction: 'none', progress: 0 }
 let soundButtonArea = null
 
@@ -140,6 +157,14 @@ let lastRenderTime = 0
 let startX = 0
 let startY = 0
 let hasMoved = false
+
+let animating = false
+let moveAnim = null
+let displayScore = 0
+let scorePopup = null
+let highScoreFlashUntil = 0
+let birdEvent = null
+let loopStarted = false
 
 function getLayout() {
   const scaleFactor = Math.min(width / 440, height / 700)
@@ -165,10 +190,49 @@ function getLayout() {
   }
 }
 
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3)
+}
+
+function cellPos(layout, row, col) {
+  return {
+    x: layout.boardX + layout.gapSize + col * (layout.cellSize + layout.gapSize),
+    y: layout.boardY + layout.gapSize + row * (layout.cellSize + layout.gapSize)
+  }
+}
+
+function triggerBirdEvent(type) {
+  birdEvent = { type, start: Date.now() }
+}
+
+function cloneBoard(source) {
+  return source.map(row => row.slice())
+}
+
+function captureSnapshot() {
+  return {
+    board: cloneBoard(board),
+    score,
+    gameOver,
+    gameWon,
+    reachedMilestones: Array.from(reachedMilestones)
+  }
+}
+
+function restoreSnapshot(snapshot) {
+  board = cloneBoard(snapshot.board)
+  score = snapshot.score
+  displayScore = snapshot.score
+  gameOver = snapshot.gameOver
+  gameWon = snapshot.gameWon
+  reachedMilestones = new Set(snapshot.reachedMilestones)
+}
+
 function updateScore(value) {
   score += value
   if (score > highScore) {
     highScore = score
+    highScoreFlashUntil = Date.now() + 220
     try {
       wx.setStorageSync('highScore', highScore)
     } catch (e) {
@@ -185,15 +249,22 @@ function init() {
     [0, 0, 0, 0]
   ]
   score = 0
+  displayScore = 0
   gameOver = false
   gameWon = false
-  gameWonDismissed = false
-  canRevive = 3
+  canRevive = MAX_REVIVES
   reviveMode = false
+  undoLeft = MAX_UNDOS
+  undoStack = []
+  showAssistPanel = false
+  reachedMilestones = new Set()
   currentRestartBtn = null
-  winBannerArea = null
   showAnimalText = false
   currentSwipe = { direction: 'none', progress: 0 }
+  animating = false
+  moveAnim = null
+  scorePopup = null
+  birdEvent = null
 
   initSounds()
   loadAnimalImage()
@@ -201,7 +272,9 @@ function init() {
 
   addRandomNumber()
   addRandomNumber()
+  displayScore = score
   render()
+  startMainLoop()
 
   try {
     const savedHighScore = wx.getStorageSync('highScore')
@@ -246,11 +319,16 @@ function addRandomNumber() {
     }
   }
 
-  if (emptyPositions.length === 0) return
+  if (emptyPositions.length === 0) return null
 
   const position = emptyPositions[Math.floor(Math.random() * emptyPositions.length)]
-  // 60% -> 2, 20% -> 4, 20% -> 8（与 shared/game-rules.md 一致）
-  board[position.row][position.col] = Math.random() < 0.6 ? 2 : (Math.random() < 0.5 ? 4 : 8)
+  // 90% -> 2, 10% -> 4（与 shared/game-rules.md 1.1 一致）
+  board[position.row][position.col] = Math.random() < 0.9 ? 2 : 4
+  return {
+    row: position.row,
+    col: position.col,
+    value: board[position.row][position.col]
+  }
 }
 
 function render(swipe = null) {
@@ -271,26 +349,22 @@ function render(swipe = null) {
   ctx.fillRect(0, 0, width, height)
 
   if (!reviveMode && animalLoaded) {
-    const animalSize = Math.floor(300 * scaleFactor)
-    const animalX = Math.floor(width - animalSize + 10 * scaleFactor)
-    const animalY = Math.floor(height - animalSize + 15 * scaleFactor)
+    animalArea = drawBird(scaleFactor)
 
-    ctx.save()
-    ctx.imageSmoothingEnabled = true
-    ctx.shadowColor = 'rgba(0,0,0,0.3)'
-    ctx.shadowBlur = 10 * scaleFactor
-    ctx.shadowOffsetX = 3 * scaleFactor
-    ctx.shadowOffsetY = 3 * scaleFactor
-    ctx.drawImage(animalImage, animalX, animalY, animalSize, animalSize)
-    ctx.restore()
-
-    animalArea = { x: animalX, y: animalY, width: animalSize, height: animalSize }
+    if (showAssistPanel && !gameOver) {
+      renderAssistPanel(scaleFactor, animalArea)
+    } else {
+      assistUndoBtn = null
+      assistHintBtn = null
+    }
 
     if (showAnimalText && !gameOver) {
       renderAnimalTextBox(scaleFactor)
     }
   } else {
     animalArea = null
+    assistUndoBtn = null
+    assistHintBtn = null
   }
 
   if (!reviveMode && flowerLoaded) {
@@ -326,16 +400,21 @@ function render(swipe = null) {
   const currentScoreX = headerX + headerWidth - scoreCardWidth * 2 - scoreGap - 15 * scaleFactor
   const highScoreX = currentScoreX + scoreCardWidth + scoreGap
 
-  drawScoreCard(currentScoreX, headerY, scoreCardWidth, scoreCardHeight, '分数', score)
-  drawScoreCard(highScoreX, headerY, scoreCardWidth, scoreCardHeight, '最高分', highScore)
+  const shownScore = animating && moveAnim ? Math.round(displayScore) : score
+  const scoreFlash = Date.now() < highScoreFlashUntil
+  drawScoreCard(currentScoreX, headerY, scoreCardWidth, scoreCardHeight, '分数', shownScore, false)
+  drawScoreCard(highScoreX, headerY, scoreCardWidth, scoreCardHeight, '最高分', highScore, scoreFlash)
+  drawScorePopup(currentScoreX, headerY, scoreCardWidth, scaleFactor)
 
   ctx.fillStyle = THEME_FOREST.boardBackground
   roundRect(ctx, boardX, boardY, boardSize, boardSize, 12 * scaleFactor, true)
   drawGridLines(boardX, boardY, boardSize, gapSize, cellSize)
 
-  const needSwipePreview = swipe && swipe.progress > 0.15
+  const needSwipePreview = !animating && swipe && swipe.progress > 0.15
   if (needSwipePreview) {
     renderSwipeFeedback(boardX, boardY, cellSize, gapSize, swipe)
+  } else if (animating && moveAnim) {
+    renderBoardAnimation(layout)
   } else {
     for (let i = 0; i < 4; i++) {
       for (let j = 0; j < 4; j++) {
@@ -374,39 +453,125 @@ function render(swipe = null) {
     renderReviveInstructions(layout)
   }
 
-  winBannerArea = null
   if (gameOver) {
     currentRestartBtn = renderGameOverModal()
   } else {
     currentRestartBtn = null
-    if (gameWon && !gameWonDismissed) {
-      winBannerArea = renderWinBanner(scaleFactor)
-    }
   }
 
   return {
     soundBtn: soundButtonArea,
     animalBtn: gameOver || reviveMode ? null : animalArea,
-    winBanner: winBannerArea
+    assistUndoBtn,
+    assistHintBtn
   }
 }
 
-function renderWinBanner(scaleFactor) {
-  const bannerWidth = width * 0.72
-  const bannerHeight = 52 * scaleFactor
-  const bannerX = (width - bannerWidth) / 2
-  const bannerY = height * 0.02
+function drawBird(scaleFactor) {
+  const animalSize = Math.floor(300 * scaleFactor)
+  const animalX = Math.floor(width - animalSize + 10 * scaleFactor)
+  const animalY = Math.floor(height - animalSize + 15 * scaleFactor)
+  const area = { x: animalX, y: animalY, width: animalSize, height: animalSize }
+  const now = Date.now()
+  const idle = !gameOver && !reviveMode
+  let bob = idle ? Math.sin(now / 800) * 4 : 0
+  let tilt = idle ? Math.sin(now / 1600) * 2 * Math.PI / 180 : 0
+  let squash = 1
 
-  ctx.fillStyle = THEME_FOREST.gameWon.background
-  roundRect(ctx, bannerX, bannerY, bannerWidth, bannerHeight, 10, true)
+  if (birdEvent && idle) {
+    const t = (now - birdEvent.start) / 280
+    if (t >= 1) {
+      birdEvent = null
+    } else {
+      const wave = Math.sin(Math.min(t, 1) * Math.PI)
+      if (birdEvent.type === 'hop') {
+        bob -= 8 * wave
+        squash = 1 - 0.08 * wave
+      } else if (birdEvent.type === 'peck') {
+        tilt += (8 * wave) * Math.PI / 180
+      } else if (birdEvent.type === 'nudge') {
+        tilt += Math.sin(t * Math.PI * 4) * 3 * Math.PI / 180
+        bob -= 3 * wave
+      }
+    }
+  }
 
-  ctx.fillStyle = THEME_FOREST.text.dark
-  ctx.font = `bold ${16 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  const originX = animalX + animalSize * 0.52
+  const originY = animalY + animalSize * 0.82
+  ctx.save()
+  ctx.imageSmoothingEnabled = true
+  ctx.translate(originX, originY + bob)
+  ctx.rotate(tilt)
+  ctx.scale(1 / squash, squash)
+  ctx.shadowColor = 'rgba(0,0,0,0.3)'
+  ctx.shadowBlur = 10 * scaleFactor
+  ctx.shadowOffsetX = 3 * scaleFactor
+  ctx.shadowOffsetY = 3 * scaleFactor
+  ctx.drawImage(animalImage, animalX - originX, animalY - originY, animalSize, animalSize)
+  ctx.restore()
+
+  drawUndoBadge(area, scaleFactor, bob)
+  return area
+}
+
+function drawUndoBadge(area, scaleFactor, bob = 0) {
+  const badgeSize = 28 * scaleFactor
+  const badgeX = area.x + area.width * 0.18
+  const badgeY = area.y + area.height * 0.22 + bob
+  ctx.fillStyle = undoLeft > 0 ? THEME_FOREST.tiles['64'].background : THEME_FOREST.emptyCell
+  roundRect(ctx, badgeX, badgeY, badgeSize, badgeSize, badgeSize / 2, true)
+  ctx.fillStyle = undoLeft > 0 ? THEME_FOREST.text.light : THEME_FOREST.text.dark
+  ctx.font = `bold ${14 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText('达成 2048！点击继续', width / 2, bannerY + bannerHeight / 2)
+  ctx.fillText(String(undoLeft), badgeX + badgeSize / 2, badgeY + badgeSize / 2)
+}
 
-  return { x: bannerX, y: bannerY, width: bannerWidth, height: bannerHeight }
+function renderAssistPanel(scaleFactor, animalArea) {
+  const panelWidth = width * 0.52
+  const panelHeight = 108 * scaleFactor
+  const panelX = Math.max(12 * scaleFactor, animalArea.x - panelWidth + 36 * scaleFactor)
+  const panelY = animalArea.y - 4 * scaleFactor
+
+  ctx.fillStyle = THEME_FOREST.background
+  roundRect(ctx, panelX, panelY, panelWidth, panelHeight, 12, true)
+  ctx.strokeStyle = THEME_FOREST.tiles['16'].background
+  ctx.lineWidth = 2 * scaleFactor
+  roundRect(ctx, panelX, panelY, panelWidth, panelHeight, 12, false, true)
+
+  ctx.fillStyle = THEME_FOREST.text.dark
+  ctx.font = `bold ${13 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'top'
+  ctx.fillText('小鸟助攻', panelX + 12 * scaleFactor, panelY + 10 * scaleFactor)
+
+  const btnWidth = panelWidth - 24 * scaleFactor
+  const btnHeight = 32 * scaleFactor
+  const undoY = panelY + 32 * scaleFactor
+  const hintY = undoY + btnHeight + 6 * scaleFactor
+  const canUndo = undoLeft > 0 && undoStack.length > 0
+
+  ctx.fillStyle = canUndo ? THEME_FOREST.tiles['64'].background : THEME_FOREST.emptyCell
+  roundRect(ctx, panelX + 12 * scaleFactor, undoY, btnWidth, btnHeight, 8, true)
+  ctx.fillStyle = canUndo ? THEME_FOREST.text.light : THEME_FOREST.text.dark
+  ctx.font = `bold ${13 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(
+    canUndo ? `衔回上一步 (${undoLeft})` : '衔回已用完',
+    panelX + 12 * scaleFactor + btnWidth / 2,
+    undoY + btnHeight / 2
+  )
+
+  ctx.fillStyle = THEME_FOREST.tiles['16'].background
+  roundRect(ctx, panelX + 12 * scaleFactor, hintY, btnWidth, btnHeight, 8, true)
+  ctx.fillStyle = THEME_FOREST.tiles['16'].text
+  ctx.fillText('听提示', panelX + 12 * scaleFactor + btnWidth / 2, hintY + btnHeight / 2)
+
+  assistUndoBtn = canUndo
+    ? { x: panelX + 12 * scaleFactor, y: undoY, width: btnWidth, height: btnHeight }
+    : null
+  assistHintBtn = { x: panelX + 12 * scaleFactor, y: hintY, width: btnWidth, height: btnHeight }
 }
 
 function drawGridLines(boardX, boardY, boardSize, gapSize, cellSize) {
@@ -430,13 +595,13 @@ function drawGridLines(boardX, boardY, boardSize, gapSize, cellSize) {
   }
 }
 
-function drawScoreCard(x, y, cardWidth, cardHeight, label, value) {
+function drawScoreCard(x, y, cardWidth, cardHeight, label, value, flash = false) {
   ctx.shadowColor = THEME_FOREST.score.shadow
   ctx.shadowBlur = 6
   ctx.shadowOffsetX = 0
   ctx.shadowOffsetY = 3
 
-  ctx.fillStyle = THEME_FOREST.score.background
+  ctx.fillStyle = flash ? THEME_FOREST.tiles['16'].background : THEME_FOREST.score.background
   roundRect(ctx, x, y, cardWidth, cardHeight, 8, true)
 
   ctx.shadowColor = 'transparent'
@@ -455,17 +620,40 @@ function drawScoreCard(x, y, cardWidth, cardHeight, label, value) {
   ctx.fillText(value.toLocaleString(), x + cardWidth / 2, y + cardHeight * 0.65)
 }
 
-function drawTile(x, y, size, value) {
+function drawScorePopup(cardX, cardY, cardWidth, scaleFactor) {
+  if (!scorePopup) return
+  const t = (Date.now() - scorePopup.start) / SCORE_POP_MS
+  if (t >= 1) {
+    scorePopup = null
+    return
+  }
+  ctx.save()
+  ctx.globalAlpha = 1 - t
+  ctx.fillStyle = THEME_FOREST.tiles['128'].background
+  ctx.font = `bold ${18 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'bottom'
+  ctx.fillText(`+${scorePopup.delta}`, cardX + cardWidth / 2, cardY - 4 * scaleFactor - t * 28 * scaleFactor)
+  ctx.restore()
+}
+
+function drawTile(x, y, size, value, scale = 1) {
   const style = getTileStyle(value)
+  const cx = x + size / 2
+  const cy = y + size / 2
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.scale(scale, scale)
   ctx.fillStyle = style.background
-  roundRect(ctx, x, y, size, size, 6, true)
+  roundRect(ctx, -size / 2, -size / 2, size, size, 6, true)
 
   const fontSize = value < 100 ? size / 2 : value < 1000 ? size / 2.5 : size / 3.2
   ctx.fillStyle = style.text
   ctx.font = `bold ${fontSize}px 'Helvetica Neue', Arial, sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(String(value), x + size / 2, y + size / 2)
+  ctx.fillText(String(value), 0, 0)
+  ctx.restore()
 }
 
 function roundRect(context, x, y, w, h, radius, fill, stroke) {
@@ -584,12 +772,6 @@ function handleTap(endX, endY) {
     }
   }
 
-  if (!gameOver && gameWon && !gameWonDismissed && pointInRect(endX, endY, uiElements.winBanner)) {
-    gameWonDismissed = true
-    render()
-    return true
-  }
-
   if (pointInRect(endX, endY, uiElements.soundBtn)) {
     toggleSound()
     render()
@@ -597,9 +779,27 @@ function handleTap(endX, endY) {
   }
 
   if (!reviveMode && !gameOver) {
-    if (pointInRect(endX, endY, uiElements.animalBtn)) {
+    if (showAssistPanel && pointInRect(endX, endY, uiElements.assistUndoBtn)) {
+      performUndo()
+      return true
+    }
+    if (showAssistPanel && pointInRect(endX, endY, uiElements.assistHintBtn)) {
+      showAssistPanel = false
       playBirdSound()
       toggleAnimalText()
+      return true
+    }
+    if (pointInRect(endX, endY, uiElements.animalBtn)) {
+      playBirdSound()
+      triggerBirdEvent('hop')
+      showAssistPanel = !showAssistPanel
+      showAnimalText = false
+      render()
+      return true
+    }
+    if (showAssistPanel) {
+      showAssistPanel = false
+      render()
       return true
     }
     if (showAnimalText) {
@@ -614,7 +814,6 @@ function handleTap(endX, endY) {
 
 wx.onTouchStart(startEvent => {
   unlockAudioIfNeeded()
-
   startX = startEvent.touches[0].clientX
   startY = startEvent.touches[0].clientY
   hasMoved = false
@@ -622,7 +821,7 @@ wx.onTouchStart(startEvent => {
 })
 
 wx.onTouchMove(moveEvent => {
-  if (reviveMode || gameOver) return
+  if (animating || reviveMode || gameOver) return
 
   const now = Date.now()
   const moveX = moveEvent.touches[0].clientX - startX
@@ -661,6 +860,13 @@ wx.onTouchEnd(endEvent => {
 
   currentSwipe = { direction: 'none', progress: 0 }
 
+  if (animating) {
+    if (!hasMoved || (Math.abs(diffX) < 5 && Math.abs(diffY) < 5)) {
+      handleTap(endX, endY)
+    }
+    return
+  }
+
   if (!hasMoved || (Math.abs(diffX) < 5 && Math.abs(diffY) < 5)) {
     if (reviveMode) {
       handleReviveTileSelection(endX, endY)
@@ -680,21 +886,47 @@ wx.onTouchEnd(endEvent => {
     return
   }
 
+  const snapshot = captureSnapshot()
+  const oldBoard = cloneBoard(board)
+  const oldScore = score
   let moved = false
+  let direction = 'none'
   if (Math.abs(diffX) > Math.abs(diffY)) {
+    direction = diffX > 0 ? 'right' : 'left'
     moved = diffX > 0 ? moveRight() : moveLeft()
   } else {
+    direction = diffY > 0 ? 'down' : 'up'
     moved = diffY > 0 ? moveDown() : moveUp()
   }
 
   if (moved) {
-    addRandomNumber()
+    undoStack.push(snapshot)
+    if (undoStack.length > MAX_UNDOS) undoStack.shift()
+    showAssistPanel = false
+    const anims = generateMoveAnims(oldBoard, direction)
+    const postMove = cloneBoard(board)
+    const spawn = addRandomNumber()
+    const scoreDelta = score - oldScore
     checkGameStatus()
-    render()
+    if (scoreDelta > 0) triggerBirdEvent('nudge')
+    startMoveAnimation(anims, postMove, spawn, oldScore, score, scoreDelta)
   } else {
     render()
   }
 })
+
+function performUndo() {
+  if (undoLeft <= 0 || undoStack.length === 0 || reviveMode) return false
+  const snapshot = undoStack.pop()
+  restoreSnapshot(snapshot)
+  undoLeft--
+  showAssistPanel = false
+  showAnimalText = false
+  playBirdSound()
+  triggerBirdEvent('peck')
+  render()
+  return true
+}
 
 function handleReviveTileSelection(touchX, touchY) {
   const { gapSize, cellSize, boardSize, boardX, boardY } = getLayout()
@@ -767,19 +999,19 @@ function isGameOver() {
 }
 
 function checkGameStatus() {
-  let reached2048 = false
+  let maxTile = 0
   for (let i = 0; i < 4; i++) {
     for (let j = 0; j < 4; j++) {
-      if (board[i][j] >= 2048) {
-        reached2048 = true
-      }
+      if (board[i][j] > maxTile) maxTile = board[i][j]
     }
   }
 
-  if (reached2048 && !gameWon) {
-    gameWon = true
-    gameWonDismissed = false
+  for (let i = 0; i < MILESTONES.length; i++) {
+    const milestone = MILESTONES[i]
+    if (maxTile >= milestone) reachedMilestones.add(milestone)
   }
+
+  if (maxTile >= 2048) gameWon = true
 
   if (isGameOver()) {
     gameOver = true
@@ -1090,6 +1322,187 @@ function toggleAnimalText() {
     showAnimalText = true
   }
   render()
+}
+
+function compressLine(cells) {
+  const anims = []
+  let dest = 0
+  let i = 0
+  while (i < cells.length) {
+    if (i + 1 < cells.length && cells[i].value === cells[i + 1].value) {
+      anims.push({
+        from: cells[i].index,
+        to: dest,
+        value: cells[i].value,
+        merged: true,
+        result: cells[i].value * 2
+      })
+      anims.push({
+        from: cells[i + 1].index,
+        to: dest,
+        value: cells[i + 1].value,
+        merged: true,
+        result: cells[i].value * 2
+      })
+      dest++
+      i += 2
+    } else {
+      anims.push({
+        from: cells[i].index,
+        to: dest,
+        value: cells[i].value,
+        merged: false,
+        result: cells[i].value
+      })
+      dest++
+      i++
+    }
+  }
+  return anims
+}
+
+function generateMoveAnims(oldBoard, direction) {
+  const out = []
+  if (direction === 'left' || direction === 'right') {
+    for (let r = 0; r < 4; r++) {
+      const cells = []
+      if (direction === 'left') {
+        for (let c = 0; c < 4; c++) {
+          if (oldBoard[r][c]) cells.push({ index: c, value: oldBoard[r][c] })
+        }
+        compressLine(cells).forEach(a => {
+          out.push({ sr: r, sc: a.from, er: r, ec: a.to, value: a.value, merged: a.merged, result: a.result })
+        })
+      } else {
+        for (let c = 3; c >= 0; c--) {
+          if (oldBoard[r][c]) cells.push({ index: c, value: oldBoard[r][c] })
+        }
+        compressLine(cells).forEach(a => {
+          out.push({ sr: r, sc: a.from, er: r, ec: 3 - a.to, value: a.value, merged: a.merged, result: a.result })
+        })
+      }
+    }
+  } else {
+    for (let c = 0; c < 4; c++) {
+      const cells = []
+      if (direction === 'up') {
+        for (let r = 0; r < 4; r++) {
+          if (oldBoard[r][c]) cells.push({ index: r, value: oldBoard[r][c] })
+        }
+        compressLine(cells).forEach(a => {
+          out.push({ sr: a.from, sc: c, er: a.to, ec: c, value: a.value, merged: a.merged, result: a.result })
+        })
+      } else {
+        for (let r = 3; r >= 0; r--) {
+          if (oldBoard[r][c]) cells.push({ index: r, value: oldBoard[r][c] })
+        }
+        compressLine(cells).forEach(a => {
+          out.push({ sr: a.from, sc: c, er: 3 - a.to, ec: c, value: a.value, merged: a.merged, result: a.result })
+        })
+      }
+    }
+  }
+  return out
+}
+
+function startMoveAnimation(anims, postMove, spawn, oldScore, newScore, scoreDelta) {
+  animating = true
+  displayScore = oldScore
+  if (scoreDelta > 0) {
+    scorePopup = { delta: scoreDelta, start: Date.now() }
+  }
+  moveAnim = {
+    anims,
+    postMove,
+    spawn,
+    oldScore,
+    newScore,
+    start: Date.now()
+  }
+  render()
+}
+
+function renderBoardAnimation(layout) {
+  const { cellSize } = layout
+  const elapsed = Date.now() - moveAnim.start
+  const slideT = easeOutCubic(Math.min(elapsed / SLIDE_MS, 1))
+  const spawnT = elapsed < SPAWN_START_MS ? 0 : Math.min((elapsed - SPAWN_START_MS) / SPAWN_MS, 1)
+  const popT = elapsed < POP_START_MS ? 0 : Math.min((elapsed - POP_START_MS) / POP_MS, 1)
+  displayScore = moveAnim.oldScore + (moveAnim.newScore - moveAnim.oldScore) * Math.min(elapsed / SLIDE_MS, 1)
+
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      const p = cellPos(layout, i, j)
+      ctx.fillStyle = THEME_FOREST.emptyCell
+      roundRect(ctx, p.x, p.y, cellSize, cellSize, 6, true)
+    }
+  }
+
+  const incoming = {}
+  moveAnim.anims.forEach(anim => {
+    if (anim.sr !== anim.er || anim.sc !== anim.ec) {
+      incoming[`${anim.er},${anim.ec}`] = true
+    }
+  })
+
+  const spawnKey = moveAnim.spawn ? `${moveAnim.spawn.row},${moveAnim.spawn.col}` : ''
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      const key = `${i},${j}`
+      if (!moveAnim.postMove[i][j] || incoming[key] || key === spawnKey) continue
+      const p = cellPos(layout, i, j)
+      drawTile(p.x, p.y, cellSize, moveAnim.postMove[i][j])
+    }
+  }
+
+  const drawnMerge = {}
+  moveAnim.anims.forEach(anim => {
+    const start = cellPos(layout, anim.sr, anim.sc)
+    const end = cellPos(layout, anim.er, anim.ec)
+    if (anim.merged && popT > 0) {
+      const key = `${anim.er},${anim.ec}`
+      if (!drawnMerge[key]) {
+        drawnMerge[key] = true
+        const scale = 1 + 0.12 * Math.sin(popT * Math.PI)
+        drawTile(end.x, end.y, cellSize, anim.result, scale)
+      }
+      return
+    }
+    const x = start.x + (end.x - start.x) * slideT
+    const y = start.y + (end.y - start.y) * slideT
+    drawTile(x, y, cellSize, anim.value)
+  })
+
+  if (moveAnim.spawn && spawnT > 0) {
+    const p = cellPos(layout, moveAnim.spawn.row, moveAnim.spawn.col)
+    drawTile(p.x, p.y, cellSize, moveAnim.spawn.value, easeOutCubic(spawnT))
+  }
+}
+
+function startMainLoop() {
+  if (loopStarted) return
+  loopStarted = true
+  const tick = function () {
+    requestAnimationFrame(tick)
+    if (animating && moveAnim) {
+      if (Date.now() - moveAnim.start >= MOVE_ANIM_MS) {
+        animating = false
+        moveAnim = null
+        displayScore = score
+        render()
+        return
+      }
+      render()
+      return
+    }
+    if (!gameOver && !reviveMode) {
+      if (Date.now() - lastRenderTime > 32) {
+        lastRenderTime = Date.now()
+        render()
+      }
+    }
+  }
+  requestAnimationFrame(tick)
 }
 
 wx.onShow(() => {
