@@ -12,21 +12,21 @@ This is the existing WeChat Mini Game version.
 
 Open the `mini-program/` directory (not the repository root).
 
-## Current Status (v1.1.0)
+## Current Status (v1.2.0)
 
-Play-feel update on top of the 1.0.1 quality baseline:
+UI refresh on top of the 1.1.0 play-feel rules:
 
-1. New tiles are `2` (~90%) or `4` (~10%); regular `8` spawns are gone.
-2. Bird assist: 2 undos per game (`衔回上一步`), plus tip copy.
-3. Silent milestone tracking (no top banner interrupting play).
-4. Tile slide / merge pop / score +N, plus a simple bird idle motion.
-5. Free revive reduced from 3 to 1 per game.
+1. Light full-screen scene background; bird-only sprite on the hill.
+2. HUD layout dodges the WeChat capsule; board stays near visual center.
+3. Restart / Settings capsules; sound and version live in Settings.
+4. Undo badge hides at 0; tapping the bird still shows speech after fetches are spent.
+5. Crown accent on the 鸟 in the title.
 
 Rules live in `../shared/game-rules.md`.
 
 ## Next Up
 
-- Rewarded-ad extra revive (after 1.1 feels stable).
+- Rewarded-ad extra revive (after 1.2 feels stable).
 - Optional motion polish (only if product asks for it).
 
 ## Boundary

@@ -1,7 +1,7 @@
 import './js/libs/weapp-adapter'
 import './js/libs/symbol'
 
-const APP_VERSION = '1.1.0'
+const APP_VERSION = '1.2.0'
 
 const MAX_UNDOS = 2
 const MAX_REVIVES = 1

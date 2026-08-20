@@ -3,7 +3,7 @@
 This file is the shared behavioral source of truth for the WeChat Mini Game and
 native iOS versions.
 
-Mini Game 1.1.0 implements the rules below. iOS may lag until it is updated;
+Mini Game 1.2.0 implements the rules below. iOS may lag until it is updated;
 document any platform deviation before changing implementation code.
 
 ## Board
