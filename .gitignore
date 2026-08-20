@@ -9,4 +9,5 @@ ios/.build/
 # Mini program local clutter (also ignored by packOptions)
 mini-program/game.js.backup
 mini-program/backup/
+mini-program/images/bg.png
 

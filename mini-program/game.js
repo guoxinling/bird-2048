@@ -56,9 +56,8 @@ let animalArea = null
 let showAnimalText = false
 let currentTextIndex = 0
 
-const flowerImage = wx.createImage()
-let flowerLoaded = false
-let flowerArea = null
+const bgImage = wx.createImage()
+let bgLoaded = false
 
 const animalTexts = [
   '你好！我是你的小助手iTab小蓝鸟！',
@@ -268,7 +267,7 @@ function init() {
 
   initSounds()
   loadAnimalImage()
-  loadFlowerImage()
+  loadBackgroundImage()
 
   addRandomNumber()
   addRandomNumber()
@@ -298,15 +297,28 @@ function loadAnimalImage() {
   }
 }
 
-function loadFlowerImage() {
-  flowerImage.src = 'images/flower.png'
-  flowerImage.onload = function () {
-    flowerLoaded = true
+function loadBackgroundImage() {
+  bgImage.src = 'images/bg.jpg'
+  bgImage.onload = function () {
+    bgLoaded = true
     render()
   }
-  flowerImage.onerror = function (e) {
-    console.error('花朵图片加载失败:', e)
+  bgImage.onerror = function (e) {
+    console.error('背景图片加载失败:', e)
   }
+}
+
+function drawBackground() {
+  ctx.fillStyle = THEME_FOREST.background
+  ctx.fillRect(0, 0, width, height)
+  if (!bgLoaded || !bgImage.width || !bgImage.height) return
+
+  const scale = Math.max(width / bgImage.width, height / bgImage.height)
+  const dw = bgImage.width * scale
+  const dh = bgImage.height * scale
+  const dx = (width - dw) / 2
+  const dy = height - dh
+  ctx.drawImage(bgImage, dx, dy, dw, dh)
 }
 
 function addRandomNumber() {
@@ -345,8 +357,7 @@ function render(swipe = null) {
     boardY
   } = layout
 
-  ctx.fillStyle = THEME_FOREST.background
-  ctx.fillRect(0, 0, width, height)
+  drawBackground()
 
   if (!reviveMode && animalLoaded) {
     animalArea = drawBird(scaleFactor)
@@ -365,23 +376,6 @@ function render(swipe = null) {
     animalArea = null
     assistUndoBtn = null
     assistHintBtn = null
-  }
-
-  if (!reviveMode && flowerLoaded) {
-    const flowerSize = Math.floor(190 * scaleFactor)
-    const flowerX = Math.floor(10 * scaleFactor)
-    const flowerY = Math.floor(height - flowerSize + 30 * scaleFactor)
-
-    ctx.save()
-    ctx.imageSmoothingEnabled = true
-    ctx.shadowColor = 'rgba(0,0,0,0.3)'
-    ctx.shadowBlur = 10 * scaleFactor
-    ctx.shadowOffsetX = 3 * scaleFactor
-    ctx.shadowOffsetY = 3 * scaleFactor
-    ctx.drawImage(flowerImage, flowerX, flowerY, flowerSize, flowerSize)
-    ctx.restore()
-
-    flowerArea = { x: flowerX, y: flowerY, width: flowerSize, height: flowerSize }
   }
 
   ctx.fillStyle = THEME_FOREST.text.dark
