@@ -12,19 +12,21 @@ This is the existing WeChat Mini Game version.
 
 Open the `mini-program/` directory (not the repository root).
 
-## Current Status (v1.0.1)
+## Current Status (v1.1.0)
 
-Shipped quality fixes in this tree:
+Play-feel update on top of the 1.0.1 quality baseline:
 
-1. Canvas clarity via device pixel ratio scaling.
-2. Single global touch listener set (no nested re-registration).
-3. Non-blocking 2048 win banner; game-over check no longer skipped.
-4. Tile colors for 4096+ with fallback styling.
-5. Leaner audio unlock on first gesture; upload pack ignores backups.
+1. New tiles are `2` (~90%) or `4` (~10%); regular `8` spawns are gone.
+2. Bird assist: 2 undos per game (`衔回上一步`), plus tip copy.
+3. Silent milestone tracking (no top banner interrupting play).
+4. Tile slide / merge pop / score +N, plus a simple bird idle motion.
+5. Free revive reduced from 3 to 1 per game.
+
+Rules live in `../shared/game-rules.md`.
 
 ## Next Up
 
-- Rewarded-ad revive (after gameplay stays stable).
+- Rewarded-ad extra revive (after 1.1 feels stable).
 - Optional motion polish (only if product asks for it).
 
 ## Boundary
