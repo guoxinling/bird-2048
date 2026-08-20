@@ -65,9 +65,19 @@ let audioUnlocked = false
 const animalImage = wx.createImage()
 let animalLoaded = false
 let animalArea = null
+let showAnimalText = false
+let currentTextIndex = 0
 
 const bgImage = wx.createImage()
 let bgLoaded = false
+
+const animalTexts = [
+  '点我可以衔回上一步，每局两次哦！',
+  '误滑了别慌，让我帮你把格子衔回来~',
+  '2048的诀窍是把大数留在角落！',
+  '我是iTab插件的形象大使,你发现了没?',
+  '我是一只能为你带来快乐的小鸟~'
+]
 
 const THEME_FOREST = {
   background: '#F7F6F2',
@@ -277,6 +287,7 @@ function init() {
   showAssistPanel = false
   reachedMilestones = new Set()
   currentRestartBtn = null
+  showAnimalText = false
   showSettings = false
   showRestartConfirm = false
   currentSwipe = { direction: 'none', progress: 0 }
@@ -388,10 +399,14 @@ function render(swipe = null) {
   if (!reviveMode && animalLoaded) {
     animalArea = drawBird(scaleFactor)
 
-    if (showAssistPanel && !gameOver && !showSettings && !showRestartConfirm) {
+    if (showAssistPanel && canFetchUndo() && !gameOver && !showSettings && !showRestartConfirm) {
       renderAssistPanel(scaleFactor, animalArea)
     } else {
       assistUndoBtn = null
+    }
+
+    if (showAnimalText && !gameOver && !showSettings && !showRestartConfirm) {
+      renderAnimalTextBox(scaleFactor)
     }
   } else {
     animalArea = null
@@ -523,13 +538,18 @@ function drawBird(scaleFactor) {
   return area
 }
 
+function canFetchUndo() {
+  return undoLeft > 0 && undoStack.length > 0
+}
+
 function drawUndoBadge(area, scaleFactor, bob = 0) {
+  if (undoLeft <= 0) return
   const badgeSize = 28 * scaleFactor
   const badgeX = area.x + area.width * 0.18
   const badgeY = area.y + area.height * 0.22 + bob
-  ctx.fillStyle = undoLeft > 0 ? THEME_FOREST.tiles['64'].background : THEME_FOREST.emptyCell
+  ctx.fillStyle = THEME_FOREST.tiles['64'].background
   roundRect(ctx, badgeX, badgeY, badgeSize, badgeSize, badgeSize / 2, true)
-  ctx.fillStyle = undoLeft > 0 ? THEME_FOREST.text.light : THEME_FOREST.text.dark
+  ctx.fillStyle = THEME_FOREST.text.light
   ctx.font = `bold ${14 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
@@ -557,23 +577,20 @@ function renderAssistPanel(scaleFactor, animalArea) {
   const btnWidth = panelWidth - 24 * scaleFactor
   const btnHeight = 36 * scaleFactor
   const undoY = panelY + 32 * scaleFactor
-  const canUndo = undoLeft > 0 && undoStack.length > 0
 
-  ctx.fillStyle = canUndo ? THEME_FOREST.tiles['64'].background : THEME_FOREST.emptyCell
+  ctx.fillStyle = THEME_FOREST.tiles['64'].background
   roundRect(ctx, panelX + 12 * scaleFactor, undoY, btnWidth, btnHeight, 8, true)
-  ctx.fillStyle = canUndo ? THEME_FOREST.text.light : THEME_FOREST.text.dark
+  ctx.fillStyle = THEME_FOREST.text.light
   ctx.font = `bold ${13 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(
-    canUndo ? `衔回上一步 (${undoLeft})` : '衔回已用完',
+    `衔回上一步 (${undoLeft})`,
     panelX + 12 * scaleFactor + btnWidth / 2,
     undoY + btnHeight / 2
   )
 
-  assistUndoBtn = canUndo
-    ? { x: panelX + 12 * scaleFactor, y: undoY, width: btnWidth, height: btnHeight }
-    : null
+  assistUndoBtn = { x: panelX + 12 * scaleFactor, y: undoY, width: btnWidth, height: btnHeight }
 }
 
 function drawGridLines(boardX, boardY, boardSize, gapSize, cellSize) {
@@ -1002,6 +1019,7 @@ function handleTap(endX, endY) {
 
   if (pointInRect(endX, endY, uiElements.hudRestartBtn)) {
     showAssistPanel = false
+    showAnimalText = false
     showRestartConfirm = true
     render()
     return true
@@ -1009,6 +1027,7 @@ function handleTap(endX, endY) {
 
   if (pointInRect(endX, endY, uiElements.hudSettingsBtn)) {
     showAssistPanel = false
+    showAnimalText = false
     showSettings = true
     render()
     return true
@@ -1022,12 +1041,27 @@ function handleTap(endX, endY) {
     if (pointInRect(endX, endY, uiElements.animalBtn)) {
       playBirdSound()
       triggerBirdEvent('hop')
-      showAssistPanel = !showAssistPanel
+      if (canFetchUndo()) {
+        showAnimalText = false
+        showAssistPanel = !showAssistPanel
+      } else {
+        showAssistPanel = false
+        if (showAnimalText) {
+          currentTextIndex = (currentTextIndex + 1) % animalTexts.length
+        } else {
+          showAnimalText = true
+        }
+      }
       render()
       return true
     }
     if (showAssistPanel) {
       showAssistPanel = false
+      render()
+      return true
+    }
+    if (showAnimalText) {
+      showAnimalText = false
       render()
       return true
     }
@@ -1141,6 +1175,7 @@ wx.onTouchEnd(endEvent => {
     undoStack.push(snapshot)
     if (undoStack.length > MAX_UNDOS) undoStack.shift()
     showAssistPanel = false
+    showAnimalText = false
     const anims = generateMoveAnims(oldBoard, direction)
     const postMove = cloneBoard(board)
     const spawn = addRandomNumber()
@@ -1158,6 +1193,7 @@ function performUndo() {
   restoreSnapshot(snapshot)
   undoLeft--
   showAssistPanel = false
+  showAnimalText = false
   playBirdSound()
   triggerBirdEvent('peck')
   render()
@@ -1504,6 +1540,47 @@ function toggleSound() {
     unlockAudioIfNeeded()
   }
   return soundEnabled
+}
+
+function renderAnimalTextBox(scaleFactor) {
+  const boxWidth = width * 0.52
+  const boxHeight = height * 0.09
+  const boxX = Math.max(12 * scaleFactor, width * 0.06)
+  const boxY = Math.min(animalArea ? animalArea.y + 18 * scaleFactor : height * 0.68, height - boxHeight - 24 * scaleFactor)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.92)'
+  roundRect(ctx, boxX, boxY, boxWidth, boxHeight, 12, true)
+  ctx.strokeStyle = THEME_FOREST.tiles['16'].background
+  ctx.lineWidth = 2 * scaleFactor
+  roundRect(ctx, boxX, boxY, boxWidth, boxHeight, 12, false, true)
+
+  ctx.fillStyle = THEME_FOREST.text.dark
+  const text = animalTexts[currentTextIndex]
+  const fontSize = (text.length > 22 ? 12 : 14) * scaleFactor
+  ctx.font = `${fontSize}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  wrapText(ctx, text, boxX + boxWidth / 2, boxY + boxHeight / 2, boxWidth - 22 * scaleFactor, 18 * scaleFactor)
+}
+
+function wrapText(context, text, x, y, maxWidth, lineHeight) {
+  const words = text.split('')
+  let line = ''
+  let lineCount = 0
+
+  for (let n = 0; n < words.length; n++) {
+    const testLine = line + words[n]
+    const metrics = context.measureText(testLine)
+    if (metrics.width > maxWidth && n > 0) {
+      context.fillText(line, x, y - lineHeight / 2 + lineCount * lineHeight)
+      line = words[n]
+      lineCount++
+    } else {
+      line = testLine
+    }
+  }
+
+  context.fillText(line, x, y - lineHeight / 2 + lineCount * lineHeight)
 }
 
 function compressLine(cells) {
