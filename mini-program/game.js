@@ -68,6 +68,9 @@ let animalArea = null
 let showAnimalText = false
 let currentTextIndex = 0
 
+const crownImage = wx.createImage()
+let crownLoaded = false
+
 const bgImage = wx.createImage()
 let bgLoaded = false
 
@@ -299,6 +302,7 @@ function init() {
   initSounds()
   loadAnimalImage()
   loadBackgroundImage()
+  loadCrownImage()
 
   addRandomNumber()
   addRandomNumber()
@@ -326,6 +330,36 @@ function loadAnimalImage() {
   animalImage.onerror = function (e) {
     console.error('小动物图片加载失败:', e)
   }
+}
+
+function loadCrownImage() {
+  crownImage.src = 'images/crown.png'
+  crownImage.onload = function () {
+    crownLoaded = true
+    render()
+  }
+  crownImage.onerror = function (e) {
+    console.error('皇冠图片加载失败:', e)
+  }
+}
+
+function drawTitle(headerX, headerY, scaleFactor) {
+  const fontSize = 40 * scaleFactor
+  const titleX = headerX + 10 * scaleFactor
+  const titleY = headerY + 16 * scaleFactor
+  ctx.fillStyle = THEME_FOREST.text.dark
+  ctx.font = `bold ${fontSize}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'top'
+  ctx.fillText('合合小鸟', titleX, titleY)
+
+  if (!crownLoaded) return
+  const birdX = titleX + ctx.measureText('合合小').width
+  const birdW = ctx.measureText('鸟').width
+  const size = fontSize * 0.5
+  const x = birdX + birdW * 0.42 - size * 0.5
+  const y = titleY - size * 0.52
+  ctx.drawImage(crownImage, x, y, size, size)
 }
 
 function loadBackgroundImage() {
@@ -413,11 +447,7 @@ function render(swipe = null) {
     assistUndoBtn = null
   }
 
-  ctx.fillStyle = THEME_FOREST.text.dark
-  ctx.font = `bold ${40 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'top'
-  ctx.fillText('合合小鸟', headerX + 10 * scaleFactor, headerY + 16 * scaleFactor)
+  drawTitle(headerX, headerY, scaleFactor)
 
   const currentScoreX = headerX + headerWidth - scoreCardWidth * 2 - scoreGap - 15 * scaleFactor
   const highScoreX = currentScoreX + scoreCardWidth + scoreGap

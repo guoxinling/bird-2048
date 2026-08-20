@@ -5,6 +5,7 @@
 The Mini Game currently includes:
 
 - `mini-program/images/animal.png`
+- `mini-program/images/crown.png`
 - `mini-program/images/bg.jpg`
 - `mini-program/audio/bird.mp3`
 - `mini-program/audio/move.mp3`
