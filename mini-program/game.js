@@ -40,6 +40,18 @@ if (ctx.imageSmoothingQuality) {
   ctx.imageSmoothingQuality = 'high'
 }
 
+function getCapsuleBottom() {
+  try {
+    if (typeof wx.getMenuButtonBoundingClientRect === 'function') {
+      const rect = wx.getMenuButtonBoundingClientRect()
+      if (rect && rect.bottom > 0) return rect.bottom
+    }
+  } catch (e) { /* fall through */ }
+  return (windowInfo.statusBarHeight || 20) + 32
+}
+
+const capsuleBottom = getCapsuleBottom()
+
 const moveSound = wx.createInnerAudioContext()
 const mergeSound = wx.createInnerAudioContext()
 const birdSound = wx.createInnerAudioContext()
@@ -53,30 +65,9 @@ let audioUnlocked = false
 const animalImage = wx.createImage()
 let animalLoaded = false
 let animalArea = null
-let showAnimalText = false
-let currentTextIndex = 0
 
 const bgImage = wx.createImage()
 let bgLoaded = false
-
-const animalTexts = [
-  '你好！我是你的小助手iTab小蓝鸟！',
-  '用过iTab插件肯定看我眼熟吧！',
-  '你在iTab插件里玩过2048游戏吗？',
-  '2048游戏的诀窍是保持大数在角落哦！',
-  '尝试始终向一个方向滑动，可以构建数字序列！',
-  '合并相同数字时记得看准方向，避免被堵住！',
-  '积少成多，从小数字开始慢慢合并！',
-  '遇到困难不要着急，有时候需要战略性地让出一些空间！',
-  '当你看到两个相同的大数字时，一定要想办法合并它们！',
-  '游戏需要耐心和策略，不断尝试才能获得高分！',
-  '休息一下再来挑战也是不错的选择~',
-  '我是iTab插件的形象大使,你发现了没?',
-  'iTab插件是一款非常强大的浏览器插件呢',
-  '我是一只能为你带来快乐的小鸟~',
-  '点我可以衔回上一步，每局两次哦！',
-  '误滑了别慌，让我帮你把格子衔回来~'
-]
 
 const THEME_FOREST = {
   background: '#F7F6F2',
@@ -145,12 +136,19 @@ let undoLeft = MAX_UNDOS
 let undoStack = []
 let showAssistPanel = false
 let assistUndoBtn = null
-let assistHintBtn = null
 let reachedMilestones = new Set()
 
 let currentRestartBtn = null
 let currentSwipe = { direction: 'none', progress: 0 }
-let soundButtonArea = null
+let hudRestartBtn = null
+let hudSettingsBtn = null
+let showSettings = false
+let showRestartConfirm = false
+let settingsSoundBtn = null
+let settingsCloseBtn = null
+let confirmOkBtn = null
+let confirmCancelBtn = null
+let hudPressed = null
 
 let lastRenderTime = 0
 let startX = 0
@@ -171,21 +169,42 @@ function getLayout() {
   const cellSize = 80 * scaleFactor
   const gapSize = 15 * scaleFactor
   const headerX = (width - headerWidth) / 2
-  const headerY = height * 0.1
+  const headerY = capsuleBottom + 10 * scaleFactor
+  const scoreCardWidth = 110 * scaleFactor
+  const scoreCardHeight = 72 * scaleFactor
+  const scoreGap = 12 * scaleFactor
+  const pillHeight = 36 * scaleFactor
+  const pillGap = 8 * scaleFactor
   const boardSize = cellSize * 4 + gapSize * 5
   const boardX = (width - boardSize) / 2
-  const boardY = headerY + 100 * scaleFactor
+  const toolbarY = headerY + scoreCardHeight + 12 * scaleFactor
+  const minBoardY = toolbarY + pillHeight + 12 * scaleFactor
+  const birdReserve = 210 * scaleFactor
+  const maxBoardY = height - birdReserve - boardSize
+  const centeredY = (height - boardSize) / 2 - height * 0.03
+  let boardY = centeredY
+  if (maxBoardY >= minBoardY) {
+    boardY = Math.min(Math.max(centeredY, minBoardY), maxBoardY)
+  } else {
+    boardY = minBoardY
+  }
 
   return {
     scaleFactor,
     headerWidth,
     headerX,
     headerY,
+    scoreCardWidth,
+    scoreCardHeight,
+    scoreGap,
+    pillHeight,
+    pillGap,
     cellSize,
     gapSize,
     boardSize,
     boardX,
-    boardY
+    boardY,
+    toolbarY
   }
 }
 
@@ -258,7 +277,8 @@ function init() {
   showAssistPanel = false
   reachedMilestones = new Set()
   currentRestartBtn = null
-  showAnimalText = false
+  showSettings = false
+  showRestartConfirm = false
   currentSwipe = { direction: 'none', progress: 0 }
   animating = false
   moveAnim = null
@@ -350,11 +370,17 @@ function render(swipe = null) {
     headerWidth,
     headerX,
     headerY,
+    scoreCardWidth,
+    scoreCardHeight,
+    scoreGap,
+    pillHeight,
+    pillGap,
     cellSize,
     gapSize,
     boardSize,
     boardX,
-    boardY
+    boardY,
+    toolbarY
   } = layout
 
   drawBackground()
@@ -362,35 +388,22 @@ function render(swipe = null) {
   if (!reviveMode && animalLoaded) {
     animalArea = drawBird(scaleFactor)
 
-    if (showAssistPanel && !gameOver) {
+    if (showAssistPanel && !gameOver && !showSettings && !showRestartConfirm) {
       renderAssistPanel(scaleFactor, animalArea)
     } else {
       assistUndoBtn = null
-      assistHintBtn = null
-    }
-
-    if (showAnimalText && !gameOver) {
-      renderAnimalTextBox(scaleFactor)
     }
   } else {
     animalArea = null
     assistUndoBtn = null
-    assistHintBtn = null
   }
 
   ctx.fillStyle = THEME_FOREST.text.dark
   ctx.font = `bold ${40 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  ctx.fillText('合合小鸟', headerX + 10 * scaleFactor, headerY + 20 * scaleFactor)
+  ctx.fillText('合合小鸟', headerX + 10 * scaleFactor, headerY + 16 * scaleFactor)
 
-  ctx.font = `${10 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
-  ctx.fillStyle = 'rgba(43,65,98,0.45)'
-  ctx.fillText(`v${APP_VERSION}`, headerX + 10 * scaleFactor, headerY + 62 * scaleFactor)
-
-  const scoreCardWidth = 110 * scaleFactor
-  const scoreCardHeight = 85 * scaleFactor
-  const scoreGap = 15 * scaleFactor
   const currentScoreX = headerX + headerWidth - scoreCardWidth * 2 - scoreGap - 15 * scaleFactor
   const highScoreX = currentScoreX + scoreCardWidth + scoreGap
 
@@ -399,6 +412,16 @@ function render(swipe = null) {
   drawScoreCard(currentScoreX, headerY, scoreCardWidth, scoreCardHeight, '分数', shownScore, false)
   drawScoreCard(highScoreX, headerY, scoreCardWidth, scoreCardHeight, '最高分', highScore, scoreFlash)
   drawScorePopup(currentScoreX, headerY, scoreCardWidth, scaleFactor)
+
+  const pillsRight = highScoreX + scoreCardWidth
+  hudSettingsBtn = drawHudButton(
+    pillsRight, toolbarY, pillHeight,
+    '设置', 'gear', 6 * scaleFactor, scaleFactor, hudPressed === 'settings'
+  )
+  hudRestartBtn = drawHudButton(
+    hudSettingsBtn.x - pillGap, toolbarY, pillHeight,
+    '重新开始', 'refresh', 6 * scaleFactor, scaleFactor, hudPressed === 'restart'
+  )
 
   ctx.fillStyle = THEME_FOREST.boardBackground
   roundRect(ctx, boardX, boardY, boardSize, boardSize, 12 * scaleFactor, true)
@@ -424,25 +447,6 @@ function render(swipe = null) {
     }
   }
 
-  const soundBtnSize = 40 * scaleFactor
-  const soundBtnX = Math.floor(width - soundBtnSize - 15 * scaleFactor)
-  const soundBtnY = Math.floor(boardY + boardSize + 20 * scaleFactor)
-
-  ctx.fillStyle = soundEnabled ? THEME_FOREST.tiles['16'].background : THEME_FOREST.emptyCell
-  roundRect(ctx, soundBtnX, soundBtnY, soundBtnSize, soundBtnSize, 5, true)
-  ctx.fillStyle = soundEnabled ? THEME_FOREST.tiles['16'].text : THEME_FOREST.text.dark
-  ctx.font = `bold ${soundBtnSize * 0.5}px 'Helvetica Neue', Arial, sans-serif`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(soundEnabled ? '🔊' : '🔇', soundBtnX + soundBtnSize / 2, soundBtnY + soundBtnSize / 2)
-
-  soundButtonArea = {
-    x: soundBtnX,
-    y: soundBtnY,
-    width: soundBtnSize,
-    height: soundBtnSize
-  }
-
   if (reviveMode) {
     renderReviveInstructions(layout)
   }
@@ -453,18 +457,32 @@ function render(swipe = null) {
     currentRestartBtn = null
   }
 
+  if (showRestartConfirm && !gameOver) {
+    renderRestartConfirm(scaleFactor)
+  } else {
+    confirmOkBtn = null
+    confirmCancelBtn = null
+  }
+
+  if (showSettings && !gameOver) {
+    renderSettingsPanel(scaleFactor)
+  } else {
+    settingsSoundBtn = null
+    settingsCloseBtn = null
+  }
+
   return {
-    soundBtn: soundButtonArea,
-    animalBtn: gameOver || reviveMode ? null : animalArea,
+    animalBtn: gameOver || reviveMode || showSettings || showRestartConfirm ? null : animalArea,
     assistUndoBtn,
-    assistHintBtn
+    hudRestartBtn: gameOver ? null : hudRestartBtn,
+    hudSettingsBtn: gameOver ? null : hudSettingsBtn
   }
 }
 
 function drawBird(scaleFactor) {
-  const animalSize = Math.floor(300 * scaleFactor)
-  const animalX = Math.floor(width - animalSize + 10 * scaleFactor)
-  const animalY = Math.floor(height - animalSize + 15 * scaleFactor)
+  const animalSize = Math.floor(220 * scaleFactor)
+  const animalX = Math.floor(width - animalSize + 8 * scaleFactor)
+  const animalY = Math.floor(height - animalSize - 24 * scaleFactor)
   const area = { x: animalX, y: animalY, width: animalSize, height: animalSize }
   const now = Date.now()
   const idle = !gameOver && !reviveMode
@@ -483,9 +501,6 @@ function drawBird(scaleFactor) {
         squash = 1 - 0.08 * wave
       } else if (birdEvent.type === 'peck') {
         tilt += (8 * wave) * Math.PI / 180
-      } else if (birdEvent.type === 'nudge') {
-        tilt += Math.sin(t * Math.PI * 4) * 3 * Math.PI / 180
-        bob -= 3 * wave
       }
     }
   }
@@ -523,9 +538,9 @@ function drawUndoBadge(area, scaleFactor, bob = 0) {
 
 function renderAssistPanel(scaleFactor, animalArea) {
   const panelWidth = width * 0.52
-  const panelHeight = 108 * scaleFactor
+  const panelHeight = 78 * scaleFactor
   const panelX = Math.max(12 * scaleFactor, animalArea.x - panelWidth + 36 * scaleFactor)
-  const panelY = animalArea.y - 4 * scaleFactor
+  const panelY = animalArea.y + 8 * scaleFactor
 
   ctx.fillStyle = THEME_FOREST.background
   roundRect(ctx, panelX, panelY, panelWidth, panelHeight, 12, true)
@@ -540,9 +555,8 @@ function renderAssistPanel(scaleFactor, animalArea) {
   ctx.fillText('小鸟助攻', panelX + 12 * scaleFactor, panelY + 10 * scaleFactor)
 
   const btnWidth = panelWidth - 24 * scaleFactor
-  const btnHeight = 32 * scaleFactor
+  const btnHeight = 36 * scaleFactor
   const undoY = panelY + 32 * scaleFactor
-  const hintY = undoY + btnHeight + 6 * scaleFactor
   const canUndo = undoLeft > 0 && undoStack.length > 0
 
   ctx.fillStyle = canUndo ? THEME_FOREST.tiles['64'].background : THEME_FOREST.emptyCell
@@ -557,15 +571,9 @@ function renderAssistPanel(scaleFactor, animalArea) {
     undoY + btnHeight / 2
   )
 
-  ctx.fillStyle = THEME_FOREST.tiles['16'].background
-  roundRect(ctx, panelX + 12 * scaleFactor, hintY, btnWidth, btnHeight, 8, true)
-  ctx.fillStyle = THEME_FOREST.tiles['16'].text
-  ctx.fillText('听提示', panelX + 12 * scaleFactor + btnWidth / 2, hintY + btnHeight / 2)
-
   assistUndoBtn = canUndo
     ? { x: panelX + 12 * scaleFactor, y: undoY, width: btnWidth, height: btnHeight }
     : null
-  assistHintBtn = { x: panelX + 12 * scaleFactor, y: hintY, width: btnWidth, height: btnHeight }
 }
 
 function drawGridLines(boardX, boardY, boardSize, gapSize, cellSize) {
@@ -629,6 +637,205 @@ function drawScorePopup(cardX, cardY, cardWidth, scaleFactor) {
   ctx.textBaseline = 'bottom'
   ctx.fillText(`+${scorePopup.delta}`, cardX + cardWidth / 2, cardY - 4 * scaleFactor - t * 28 * scaleFactor)
   ctx.restore()
+}
+
+function drawHudButton(right, y, h, label, icon, iconGap, scaleFactor, pressed) {
+  const iconSize = 14 * scaleFactor
+  const fontSize = 13 * scaleFactor
+  const padX = 13 * scaleFactor
+  const radius = h / 2
+  const color = '#555A58'
+  const fill = pressed ? '#F1EEE8' : '#F7F4EE'
+
+  ctx.font = `500 ${fontSize}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  const textW = ctx.measureText(label).width
+  const w = padX * 2 + iconSize + iconGap + textW
+  const x = right - w
+
+  ctx.save()
+  if (pressed) {
+    ctx.translate(x + w / 2, y + h / 2)
+    ctx.scale(0.97, 0.97)
+    ctx.translate(-(x + w / 2), -(y + h / 2))
+  }
+
+  ctx.shadowColor = pressed ? 'rgba(80, 70, 50, 0.04)' : 'rgba(80, 70, 50, 0.08)'
+  ctx.shadowBlur = pressed ? 2 : 5
+  ctx.shadowOffsetX = 0
+  ctx.shadowOffsetY = pressed ? 0.5 : 1.5
+  ctx.fillStyle = fill
+  roundRect(ctx, x, y, w, h, radius, true)
+
+  ctx.shadowColor = 'transparent'
+  ctx.shadowBlur = 0
+  ctx.shadowOffsetY = 0
+  ctx.strokeStyle = 'rgba(70, 70, 60, 0.08)'
+  ctx.lineWidth = 1
+  roundRect(ctx, x, y, w, h, radius, false, true)
+
+  ctx.save()
+  ctx.beginPath()
+  ctx.moveTo(x + radius, y)
+  ctx.arcTo(x + w, y, x + w, y + h, radius)
+  ctx.arcTo(x + w, y + h, x, y + h, radius)
+  ctx.arcTo(x, y + h, x, y, radius)
+  ctx.arcTo(x, y, x + w, y, radius)
+  ctx.closePath()
+  ctx.clip()
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
+  ctx.fillRect(x, y, w, 1 * scaleFactor)
+  ctx.restore()
+
+  const contentX = x + padX
+  const midY = y + h / 2
+  drawHudIcon(icon, contentX + iconSize / 2, midY, iconSize, color, 1.5 * scaleFactor)
+
+  ctx.fillStyle = color
+  ctx.font = `500 ${fontSize}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(label, contentX + iconSize + iconGap, midY + 0.5)
+  ctx.restore()
+
+  return { x, y, width: w, height: h }
+}
+
+function drawHudIcon(type, cx, cy, size, color, lineW) {
+  ctx.save()
+  ctx.strokeStyle = color
+  ctx.fillStyle = color
+  ctx.lineWidth = lineW
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  if (type === 'refresh') {
+    const r = size * 0.32
+    const start = Math.PI * 0.35
+    const end = Math.PI * 1.95
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, start, end, false)
+    ctx.stroke()
+    const ax = cx + r * Math.cos(end)
+    const ay = cy + r * Math.sin(end)
+    const ah = size * 0.22
+    const ang = end + Math.PI / 2
+    ctx.beginPath()
+    ctx.moveTo(ax + Math.cos(ang - 0.9) * ah, ay + Math.sin(ang - 0.9) * ah)
+    ctx.lineTo(ax, ay)
+    ctx.lineTo(ax + Math.cos(ang + 2.4) * ah * 0.55, ay + Math.sin(ang + 2.4) * ah * 0.55)
+    ctx.stroke()
+  } else {
+    const hole = size * 0.14
+    const ring = size * 0.26
+    const tooth = size * 0.16
+    ctx.beginPath()
+    ctx.arc(cx, cy, hole, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(cx, cy, ring, 0, Math.PI * 2)
+    ctx.stroke()
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3
+      ctx.beginPath()
+      ctx.moveTo(cx + Math.cos(a) * ring, cy + Math.sin(a) * ring)
+      ctx.lineTo(cx + Math.cos(a) * (ring + tooth), cy + Math.sin(a) * (ring + tooth))
+      ctx.stroke()
+    }
+  }
+  ctx.restore()
+}
+
+function renderSettingsPanel(scaleFactor) {
+  ctx.fillStyle = 'rgba(43, 65, 98, 0.28)'
+  ctx.fillRect(0, 0, width, height)
+
+  const panelW = width * 0.78
+  const panelH = 220 * scaleFactor
+  const panelX = (width - panelW) / 2
+  const panelY = (height - panelH) / 2
+
+  ctx.fillStyle = THEME_FOREST.background
+  roundRect(ctx, panelX, panelY, panelW, panelH, 16, true)
+
+  ctx.fillStyle = THEME_FOREST.text.dark
+  ctx.font = `bold ${20 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.fillText('设置', width / 2, panelY + 22 * scaleFactor)
+
+  const rowX = panelX + 20 * scaleFactor
+  const rowW = panelW - 40 * scaleFactor
+  const rowH = 44 * scaleFactor
+  const soundY = panelY + 68 * scaleFactor
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'
+  roundRect(ctx, rowX, soundY, rowW, rowH, 10, true)
+  ctx.fillStyle = THEME_FOREST.text.dark
+  ctx.font = `${15 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('音效', rowX + 14 * scaleFactor, soundY + rowH / 2)
+  ctx.textAlign = 'right'
+  ctx.fillStyle = soundEnabled ? THEME_FOREST.tiles['128'].background : THEME_FOREST.text.dark
+  ctx.fillText(soundEnabled ? '开' : '关', rowX + rowW - 14 * scaleFactor, soundY + rowH / 2)
+
+  ctx.fillStyle = 'rgba(43,65,98,0.45)'
+  ctx.font = `${13 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.fillText(`版本 v${APP_VERSION}`, width / 2, panelY + 132 * scaleFactor)
+
+  const closeW = rowW
+  const closeH = 40 * scaleFactor
+  const closeY = panelY + panelH - closeH - 18 * scaleFactor
+  ctx.fillStyle = THEME_FOREST.tiles['16'].background
+  roundRect(ctx, rowX, closeY, closeW, closeH, 10, true)
+  ctx.fillStyle = THEME_FOREST.tiles['16'].text
+  ctx.font = `bold ${15 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  ctx.fillText('关闭', width / 2, closeY + closeH / 2)
+
+  settingsSoundBtn = { x: rowX, y: soundY, width: rowW, height: rowH }
+  settingsCloseBtn = { x: rowX, y: closeY, width: closeW, height: closeH }
+}
+
+function renderRestartConfirm(scaleFactor) {
+  ctx.fillStyle = 'rgba(43, 65, 98, 0.28)'
+  ctx.fillRect(0, 0, width, height)
+
+  const panelW = width * 0.78
+  const panelH = 190 * scaleFactor
+  const panelX = (width - panelW) / 2
+  const panelY = (height - panelH) / 2
+
+  ctx.fillStyle = THEME_FOREST.background
+  roundRect(ctx, panelX, panelY, panelW, panelH, 16, true)
+
+  ctx.fillStyle = THEME_FOREST.text.dark
+  ctx.font = `bold ${18 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.fillText('重新开始本局？', width / 2, panelY + 28 * scaleFactor)
+  ctx.font = `${13 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  ctx.fillStyle = 'rgba(43,65,98,0.7)'
+  ctx.fillText('当前分数和衔回次数会清零', width / 2, panelY + 62 * scaleFactor)
+
+  const btnW = (panelW - 48 * scaleFactor) / 2
+  const btnH = 40 * scaleFactor
+  const btnY = panelY + panelH - btnH - 22 * scaleFactor
+  const cancelX = panelX + 18 * scaleFactor
+  const okX = cancelX + btnW + 12 * scaleFactor
+
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'
+  roundRect(ctx, cancelX, btnY, btnW, btnH, 10, true)
+  ctx.fillStyle = THEME_FOREST.text.dark
+  ctx.font = `bold ${15 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  ctx.textBaseline = 'middle'
+  ctx.fillText('取消', cancelX + btnW / 2, btnY + btnH / 2)
+
+  ctx.fillStyle = THEME_FOREST.tiles['64'].background
+  roundRect(ctx, okX, btnY, btnW, btnH, 10, true)
+  ctx.fillStyle = THEME_FOREST.text.light
+  ctx.fillText('确定', okX + btnW / 2, btnY + btnH / 2)
+
+  confirmCancelBtn = { x: cancelX, y: btnY, width: btnW, height: btnH }
+  confirmOkBtn = { x: okX, y: btnY, width: btnW, height: btnH }
 }
 
 function drawTile(x, y, size, value, scale = 1) {
@@ -764,10 +971,45 @@ function handleTap(endX, endY) {
       activateReviveMode()
       return true
     }
+    return true
   }
 
-  if (pointInRect(endX, endY, uiElements.soundBtn)) {
-    toggleSound()
+  if (showRestartConfirm) {
+    if (pointInRect(endX, endY, confirmOkBtn)) {
+      init()
+      return true
+    }
+    if (pointInRect(endX, endY, confirmCancelBtn)) {
+      showRestartConfirm = false
+      render()
+      return true
+    }
+    showRestartConfirm = false
+    render()
+    return true
+  }
+
+  if (showSettings) {
+    if (pointInRect(endX, endY, settingsSoundBtn)) {
+      toggleSound()
+      render()
+      return true
+    }
+    showSettings = false
+    render()
+    return true
+  }
+
+  if (pointInRect(endX, endY, uiElements.hudRestartBtn)) {
+    showAssistPanel = false
+    showRestartConfirm = true
+    render()
+    return true
+  }
+
+  if (pointInRect(endX, endY, uiElements.hudSettingsBtn)) {
+    showAssistPanel = false
+    showSettings = true
     render()
     return true
   }
@@ -777,27 +1019,15 @@ function handleTap(endX, endY) {
       performUndo()
       return true
     }
-    if (showAssistPanel && pointInRect(endX, endY, uiElements.assistHintBtn)) {
-      showAssistPanel = false
-      playBirdSound()
-      toggleAnimalText()
-      return true
-    }
     if (pointInRect(endX, endY, uiElements.animalBtn)) {
       playBirdSound()
       triggerBirdEvent('hop')
       showAssistPanel = !showAssistPanel
-      showAnimalText = false
       render()
       return true
     }
     if (showAssistPanel) {
       showAssistPanel = false
-      render()
-      return true
-    }
-    if (showAnimalText) {
-      showAnimalText = false
       render()
       return true
     }
@@ -812,10 +1042,16 @@ wx.onTouchStart(startEvent => {
   startY = startEvent.touches[0].clientY
   hasMoved = false
   currentSwipe = { direction: 'none', progress: 0 }
+  hudPressed = null
+  if (!gameOver && !showSettings && !showRestartConfirm) {
+    if (pointInRect(startX, startY, hudRestartBtn)) hudPressed = 'restart'
+    else if (pointInRect(startX, startY, hudSettingsBtn)) hudPressed = 'settings'
+    if (hudPressed) render()
+  }
 })
 
 wx.onTouchMove(moveEvent => {
-  if (animating || reviveMode || gameOver) return
+  if (animating || reviveMode || gameOver || showSettings || showRestartConfirm) return
 
   const now = Date.now()
   const moveX = moveEvent.touches[0].clientX - startX
@@ -823,6 +1059,10 @@ wx.onTouchMove(moveEvent => {
 
   if (Math.abs(moveX) > 15 || Math.abs(moveY) > 15) {
     hasMoved = true
+    if (hudPressed) {
+      hudPressed = null
+      render()
+    }
 
     const oldDirection = currentSwipe.direction
     const oldProgress = currentSwipe.progress
@@ -853,6 +1093,10 @@ wx.onTouchEnd(endEvent => {
   const diffY = endY - startY
 
   currentSwipe = { direction: 'none', progress: 0 }
+  if (hudPressed) {
+    hudPressed = null
+    render()
+  }
 
   if (animating) {
     if (!hasMoved || (Math.abs(diffX) < 5 && Math.abs(diffY) < 5)) {
@@ -875,8 +1119,8 @@ wx.onTouchEnd(endEvent => {
     return
   }
 
-  if (gameOver) {
-    render()
+  if (gameOver || showSettings || showRestartConfirm) {
+    handleTap(endX, endY)
     return
   }
 
@@ -902,7 +1146,6 @@ wx.onTouchEnd(endEvent => {
     const spawn = addRandomNumber()
     const scoreDelta = score - oldScore
     checkGameStatus()
-    if (scoreDelta > 0) triggerBirdEvent('nudge')
     startMoveAnimation(anims, postMove, spawn, oldScore, score, scoreDelta)
   } else {
     render()
@@ -915,7 +1158,6 @@ function performUndo() {
   restoreSnapshot(snapshot)
   undoLeft--
   showAssistPanel = false
-  showAnimalText = false
   playBirdSound()
   triggerBirdEvent('peck')
   render()
@@ -1262,60 +1504,6 @@ function toggleSound() {
     unlockAudioIfNeeded()
   }
   return soundEnabled
-}
-
-function renderAnimalTextBox(scaleFactor) {
-  const boxWidth = width * 0.5
-  const boxHeight = height * 0.075
-  const boxX = width * 0.07
-  const boxY = height * 0.71
-
-  ctx.fillStyle = THEME_FOREST.emptyCell
-  roundRect(ctx, boxX, boxY, boxWidth, boxHeight, 10, true)
-
-  ctx.strokeStyle = THEME_FOREST.tiles['16'].background
-  ctx.lineWidth = 2 * scaleFactor
-  roundRect(ctx, boxX, boxY, boxWidth, boxHeight, 10, false, true)
-
-  ctx.fillStyle = THEME_FOREST.text.dark
-  const text = animalTexts[currentTextIndex]
-  const fontSize = (text.length > 30 ? 12 : 14) * scaleFactor
-  ctx.font = `${fontSize}px 'Helvetica Neue', Arial, sans-serif`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  wrapText(ctx, text, boxX + boxWidth / 2, boxY + boxHeight / 2, boxWidth - 20 * scaleFactor, 18 * scaleFactor)
-
-  ctx.font = `${10 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
-  ctx.fillText('点击继续...', boxX + boxWidth - 40 * scaleFactor, boxY + boxHeight - 10 * scaleFactor)
-}
-
-function wrapText(context, text, x, y, maxWidth, lineHeight) {
-  const words = text.split('')
-  let line = ''
-  let lineCount = 0
-
-  for (let n = 0; n < words.length; n++) {
-    const testLine = line + words[n]
-    const metrics = context.measureText(testLine)
-    if (metrics.width > maxWidth && n > 0) {
-      context.fillText(line, x, y - lineHeight / 2 + lineCount * lineHeight)
-      line = words[n]
-      lineCount++
-    } else {
-      line = testLine
-    }
-  }
-
-  context.fillText(line, x, y - lineHeight / 2 + lineCount * lineHeight)
-}
-
-function toggleAnimalText() {
-  if (showAnimalText) {
-    currentTextIndex = (currentTextIndex + 1) % animalTexts.length
-  } else {
-    showAnimalText = true
-  }
-  render()
 }
 
 function compressLine(cells) {

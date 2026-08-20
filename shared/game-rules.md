@@ -37,7 +37,8 @@ document any platform deviation before changing implementation code.
   including the tile that spawned after that swipe.
 - Players may undo up to two successive moves if both charges remain.
 - Undo is available during play, not during revive tile selection.
-- After undos are spent, the bird still offers tips / flavor copy.
+- After undos are spent, tapping the bird still opens the assist panel, which
+  shows that fetch charges are used up.
 
 ## Milestones
 
