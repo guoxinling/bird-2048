@@ -23,6 +23,10 @@
       {
         "value": "images/bg.png",
         "type": "file"
+      },
+      {
+        "value": "images/store-cover.jpg",
+        "type": "file"
       }
     ],
     "include": []

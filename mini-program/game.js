@@ -1,7 +1,21 @@
 import './js/libs/weapp-adapter'
 import './js/libs/symbol'
+import {
+  buildNpcRows,
+  checkFriendAuthSilent,
+  dailyAllBeaten,
+  detectNewBeats,
+  drawHeheBirdAvatar,
+  getBeijingDate,
+  loadDailyBest,
+  openAuthSetting,
+  requestFriendAuth,
+  saveDailyBest,
+  uploadRankCloud
+} from './js/rank.js'
 
-const APP_VERSION = '1.2.0'
+const APP_VERSION = '1.3.0'
+const SHARE_IMAGE = 'images/share.jpg'
 
 const MAX_UNDOS = 2
 const MAX_REVIVES = 1
@@ -68,6 +82,9 @@ let animalArea = null
 let showAnimalText = false
 let currentTextIndex = 0
 
+const rankBirdImage = wx.createImage()
+let rankBirdLoaded = false
+
 const crownImage = wx.createImage()
 let crownLoaded = false
 
@@ -75,8 +92,8 @@ const bgImage = wx.createImage()
 let bgLoaded = false
 
 const animalTexts = [
-  '点我可以衔回上一步，每局两次哦！',
-  '误滑了别慌，让我帮你把格子衔回来~',
+  '点我可以撤回上一步，每局两次哦！',
+  '误滑了别慌，点我就能撤回~',
   '2048的诀窍是把大数留在角落！',
   '我是iTab插件的形象大使,你发现了没?',
   '我是一只能为你带来快乐的小鸟~'
@@ -155,8 +172,22 @@ let currentRestartBtn = null
 let currentSwipe = { direction: 'none', progress: 0 }
 let hudRestartBtn = null
 let hudSettingsBtn = null
+let hudRankBtn = null
 let showSettings = false
 let showRestartConfirm = false
+let showRank = false
+let rankTab = 'daily'
+let rankFriendOk = false
+let rankAuthTried = false
+let rankCloseBtn = null
+let rankTabDailyBtn = null
+let rankTabTotalBtn = null
+let rankAuthBtn = null
+let rankListRect = null
+let rankPanelRect = null
+let rankPostDirty = true
+let birdToast = null
+let dailyBest = { d: '', s: 0 }
 let settingsSoundBtn = null
 let settingsCloseBtn = null
 let confirmOkBtn = null
@@ -260,6 +291,8 @@ function restoreSnapshot(snapshot) {
 }
 
 function updateScore(value) {
+  const oldHigh = highScore
+  const oldDaily = (dailyBest && dailyBest.s) || 0
   score += value
   if (score > highScore) {
     highScore = score
@@ -270,6 +303,10 @@ function updateScore(value) {
       console.error('保存最高分失败', e)
     }
   }
+  dailyBest = saveDailyBest(score)
+  if (dailyBest.s > oldDaily) noteNpcBeats('daily', dailyBest.s)
+  if (highScore > oldHigh) noteNpcBeats('total', highScore)
+  if (rankFriendOk) uploadRankCloud(highScore, dailyBest)
 }
 
 function init() {
@@ -293,6 +330,7 @@ function init() {
   showAnimalText = false
   showSettings = false
   showRestartConfirm = false
+  showRank = false
   currentSwipe = { direction: 'none', progress: 0 }
   animating = false
   moveAnim = null
@@ -301,6 +339,7 @@ function init() {
 
   initSounds()
   loadAnimalImage()
+  loadRankBirdImage()
   loadBackgroundImage()
   loadCrownImage()
 
@@ -319,6 +358,10 @@ function init() {
   } catch (e) {
     console.error('读取最高分失败', e)
   }
+
+  dailyBest = loadDailyBest()
+  if (score > 0) dailyBest = saveDailyBest(score)
+  syncFriendAuthSilent()
 }
 
 function loadAnimalImage() {
@@ -329,6 +372,14 @@ function loadAnimalImage() {
   }
   animalImage.onerror = function (e) {
     console.error('小动物图片加载失败:', e)
+  }
+}
+
+function loadRankBirdImage() {
+  rankBirdImage.src = 'images/rank-bird.png'
+  rankBirdImage.onload = function () {
+    rankBirdLoaded = true
+    if (showRank) render()
   }
 }
 
@@ -433,13 +484,13 @@ function render(swipe = null) {
   if (!reviveMode && animalLoaded) {
     animalArea = drawBird(scaleFactor)
 
-    if (showAssistPanel && canFetchUndo() && !gameOver && !showSettings && !showRestartConfirm) {
+    if (showAssistPanel && canFetchUndo() && !gameOver && !showSettings && !showRestartConfirm && !showRank) {
       renderAssistPanel(scaleFactor, animalArea)
     } else {
       assistUndoBtn = null
     }
 
-    if (showAnimalText && !gameOver && !showSettings && !showRestartConfirm) {
+    if ((showAnimalText || (birdToast && Date.now() < birdToast.until)) && !gameOver && !showSettings && !showRestartConfirm && !showRank) {
       renderAnimalTextBox(scaleFactor)
     }
   } else {
@@ -465,7 +516,11 @@ function render(swipe = null) {
   )
   hudRestartBtn = drawHudButton(
     hudSettingsBtn.x - pillGap, toolbarY, pillHeight,
-    '重新开始', 'refresh', 6 * scaleFactor, scaleFactor, hudPressed === 'restart'
+    '重开', 'refresh', 6 * scaleFactor, scaleFactor, hudPressed === 'restart'
+  )
+  hudRankBtn = drawHudButton(
+    hudRestartBtn.x - pillGap, toolbarY, pillHeight,
+    '排行', 'trophy', 6 * scaleFactor, scaleFactor, hudPressed === 'rank'
   )
 
   ctx.fillStyle = THEME_FOREST.boardBackground
@@ -509,18 +564,30 @@ function render(swipe = null) {
     confirmCancelBtn = null
   }
 
-  if (showSettings && !gameOver) {
+  if (showSettings && !gameOver && !showRank) {
     renderSettingsPanel(scaleFactor)
   } else {
     settingsSoundBtn = null
     settingsCloseBtn = null
   }
 
+  if (showRank) {
+    renderRankPanel(scaleFactor, layout)
+  } else {
+    rankCloseBtn = null
+    rankTabDailyBtn = null
+    rankTabTotalBtn = null
+    rankAuthBtn = null
+    rankListRect = null
+    rankPanelRect = null
+  }
+
   return {
-    animalBtn: gameOver || reviveMode || showSettings || showRestartConfirm ? null : animalArea,
+    animalBtn: gameOver || reviveMode || showSettings || showRestartConfirm || showRank ? null : animalArea,
     assistUndoBtn,
-    hudRestartBtn: gameOver ? null : hudRestartBtn,
-    hudSettingsBtn: gameOver ? null : hudSettingsBtn
+    hudRestartBtn: gameOver || showRank ? null : hudRestartBtn,
+    hudSettingsBtn: gameOver || showRank ? null : hudSettingsBtn,
+    hudRankBtn: showSettings || showRestartConfirm || showRank ? null : hudRankBtn
   }
 }
 
@@ -615,7 +682,7 @@ function renderAssistPanel(scaleFactor, animalArea) {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(
-    `衔回上一步 (${undoLeft})`,
+    `撤回上一步 (${undoLeft})`,
     panelX + 12 * scaleFactor + btnWidth / 2,
     undoY + btnHeight / 2
   )
@@ -686,7 +753,7 @@ function drawScorePopup(cardX, cardY, cardWidth, scaleFactor) {
   ctx.restore()
 }
 
-function drawHudButton(right, y, h, label, icon, iconGap, scaleFactor, pressed) {
+function drawHudButton(anchorX, y, h, label, icon, iconGap, scaleFactor, pressed, fromLeft) {
   const iconSize = 14 * scaleFactor
   const fontSize = 13 * scaleFactor
   const padX = 13 * scaleFactor
@@ -697,7 +764,7 @@ function drawHudButton(right, y, h, label, icon, iconGap, scaleFactor, pressed) 
   ctx.font = `500 ${fontSize}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
   const textW = ctx.measureText(label).width
   const w = padX * 2 + iconSize + iconGap + textW
-  const x = right - w
+  const x = fromLeft ? anchorX : anchorX - w
 
   ctx.save()
   if (pressed) {
@@ -770,6 +837,28 @@ function drawHudIcon(type, cx, cy, size, color, lineW) {
     ctx.lineTo(ax, ay)
     ctx.lineTo(ax + Math.cos(ang + 2.4) * ah * 0.55, ay + Math.sin(ang + 2.4) * ah * 0.55)
     ctx.stroke()
+  } else if (type === 'trophy') {
+    const top = cy - size * 0.28
+    const bot = cy + size * 0.06
+    ctx.beginPath()
+    ctx.moveTo(cx - size * 0.2, top)
+    ctx.lineTo(cx + size * 0.2, top)
+    ctx.lineTo(cx + size * 0.14, bot)
+    ctx.lineTo(cx - size * 0.14, bot)
+    ctx.closePath()
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(cx - size * 0.2, top + size * 0.12, size * 0.1, Math.PI * 0.45, Math.PI * 1.55)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(cx + size * 0.2, top + size * 0.12, size * 0.1, -Math.PI * 0.55, Math.PI * 0.55)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(cx, bot)
+    ctx.lineTo(cx, cy + size * 0.22)
+    ctx.moveTo(cx - size * 0.13, cy + size * 0.22)
+    ctx.lineTo(cx + size * 0.13, cy + size * 0.22)
+    ctx.stroke()
   } else {
     const hole = size * 0.14
     const ring = size * 0.26
@@ -796,7 +885,7 @@ function renderSettingsPanel(scaleFactor) {
   ctx.fillRect(0, 0, width, height)
 
   const panelW = width * 0.78
-  const panelH = 220 * scaleFactor
+  const panelH = 248 * scaleFactor
   const panelX = (width - panelW) / 2
   const panelY = (height - panelH) / 2
 
@@ -827,7 +916,11 @@ function renderSettingsPanel(scaleFactor) {
   ctx.fillStyle = 'rgba(43,65,98,0.45)'
   ctx.font = `${13 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
   ctx.textAlign = 'center'
-  ctx.fillText(`版本 v${APP_VERSION}`, width / 2, panelY + 132 * scaleFactor)
+  ctx.textBaseline = 'middle'
+  ctx.fillText(`版本 v${APP_VERSION}`, width / 2, panelY + 128 * scaleFactor)
+  ctx.font = `${12 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.fillStyle = 'rgba(43,65,98,0.4)'
+  ctx.fillText('此产品由iTab新标签页团队开发。', width / 2, panelY + 150 * scaleFactor)
 
   const closeW = rowW
   const closeH = 40 * scaleFactor
@@ -836,10 +929,302 @@ function renderSettingsPanel(scaleFactor) {
   roundRect(ctx, rowX, closeY, closeW, closeH, 10, true)
   ctx.fillStyle = THEME_FOREST.tiles['16'].text
   ctx.font = `bold ${15 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  ctx.textBaseline = 'middle'
   ctx.fillText('关闭', width / 2, closeY + closeH / 2)
 
   settingsSoundBtn = { x: rowX, y: soundY, width: rowW, height: rowH }
   settingsCloseBtn = { x: rowX, y: closeY, width: closeW, height: closeH }
+}
+
+function getOpenDataContextSafe() {
+  try {
+    if (typeof wx.getOpenDataContext === 'function') return wx.getOpenDataContext()
+  } catch (e) { /* ignore */ }
+  return null
+}
+
+function noteNpcBeats(tab, playerScore) {
+  const rows = buildNpcRows(tab, playerScore)
+  const copy = detectNewBeats(tab, rows, playerScore)
+  if (!copy) return
+  birdToast = { text: copy, until: Date.now() + 3200 }
+  showAnimalText = true
+  triggerBirdEvent('hop')
+}
+
+function syncFriendAuthSilent() {
+  checkFriendAuthSilent().then(ok => {
+    rankFriendOk = ok
+    if (ok) uploadRankCloud(highScore, loadDailyBest())
+  })
+}
+
+function playerScoreForTab() {
+  return rankTab === 'daily' ? (loadDailyBest().s || 0) : highScore
+}
+
+function localRankRows() {
+  const playerScore = playerScoreForTab()
+  const npcs = buildNpcRows(rankTab, playerScore)
+  const rows = npcs.concat([{
+    id: 'self',
+    name: '我',
+    score: playerScore,
+    beaten: false,
+    kind: 'self',
+    isSelf: true
+  }])
+  rows.sort((a, b) => b.score - a.score || (a.isSelf ? -1 : 1))
+  return rows
+}
+
+function postRankToOpenData(listRect, scaleFactor) {
+  const odc = getOpenDataContextSafe()
+  if (!odc || !listRect) return
+  const dpr = windowInfo.pixelRatio || 1
+  odc.canvas.width = Math.max(1, Math.floor(listRect.width * dpr))
+  odc.canvas.height = Math.max(1, Math.floor(listRect.height * dpr))
+  const playerScore = playerScoreForTab()
+  odc.postMessage({
+    type: 'render',
+    tab: rankTab,
+    today: getBeijingDate(),
+    playerScore,
+    npcs: buildNpcRows(rankTab, playerScore),
+    showFriends: rankFriendOk,
+    width: listRect.width,
+    height: listRect.height,
+    dpr
+  })
+}
+
+function openRankPanel() {
+  showRank = true
+  showSettings = false
+  showRestartConfirm = false
+  showAssistPanel = false
+  showAnimalText = false
+  rankTab = 'daily'
+  rankPostDirty = true
+  rankAuthTried = false
+  requestFriendAuth().then(ok => {
+    rankFriendOk = ok
+    rankAuthTried = true
+    if (ok) uploadRankCloud(highScore, loadDailyBest())
+    rankPostDirty = true
+    render()
+  })
+  render()
+}
+
+function drawMeBadge(x, y, scaleFactor) {
+  const bw = 22 * scaleFactor
+  const bh = 16 * scaleFactor
+  ctx.fillStyle = '#D5E3F0'
+  roundRect(ctx, x, y - bh / 2, bw, bh, 8, true)
+  ctx.fillStyle = '#2B4162'
+  ctx.font = `500 ${10 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('我', x + bw / 2, y + 0.5)
+  return bw
+}
+
+function drawRankAvatar(x, y, size, row) {
+  if (row.kind === 'npc') {
+    if (animalLoaded) {
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2)
+      ctx.closePath()
+      ctx.fillStyle = '#E7F2EE'
+      ctx.fill()
+      ctx.clip()
+      ctx.drawImage(animalImage, 150, 40, 560, 560, x - size * 0.04, y - size * 0.02, size * 1.12, size * 1.12)
+      ctx.restore()
+      return
+    }
+    if (rankBirdLoaded) {
+      ctx.drawImage(rankBirdImage, x, y, size, size)
+      return
+    }
+    drawHeheBirdAvatar(ctx, x, y, size, row.id)
+    return
+  }
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2)
+  ctx.closePath()
+  ctx.fillStyle = '#D5E3F0'
+  ctx.fill()
+  ctx.restore()
+}
+
+function drawRankListLocal(x, y, w, h, scaleFactor) {
+  const rows = localRankRows()
+  const rowH = 50 * scaleFactor
+  rows.slice(0, 6).forEach((row, index) => {
+    const ry = y + index * rowH
+    if (ry + rowH > y + h) return
+    const inset = 2
+    const rw = w - inset * 2
+    const rh = rowH - 6 * scaleFactor
+    const rx = x + inset
+    const boxY = ry + 3 * scaleFactor
+    if (index === 0) ctx.fillStyle = '#F6E7C1'
+    else if (index === 1) ctx.fillStyle = '#E7E7E4'
+    else if (index === 2) ctx.fillStyle = '#EDD4C0'
+    else if (row.isSelf) ctx.fillStyle = 'rgba(213, 227, 240, 0.85)'
+    else ctx.fillStyle = 'rgba(255,255,255,0.72)'
+    roundRect(ctx, rx, boxY, rw, rh, 12, true)
+    if (row.isSelf) {
+      ctx.strokeStyle = '#8FB4D4'
+      ctx.lineWidth = 1.5
+      roundRect(ctx, rx, boxY, rw, rh, 12, false, true)
+    }
+
+    ctx.fillStyle = index === 0 ? '#C9A227' : index === 1 ? '#8E8E8E' : index === 2 ? '#C08457' : THEME_FOREST.text.dark
+    ctx.font = `bold ${16 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(index + 1), x + 20 * scaleFactor, ry + rowH / 2)
+
+    const avS = 34 * scaleFactor
+    drawRankAvatar(x + 34 * scaleFactor, ry + (rowH - avS) / 2, avS, row)
+
+    ctx.textAlign = 'left'
+    ctx.fillStyle = row.beaten ? 'rgba(43,65,98,0.45)' : THEME_FOREST.text.dark
+    ctx.font = `${15 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+    const nameX = x + 74 * scaleFactor
+    ctx.fillText(row.name, nameX, ry + rowH / 2)
+    let cursorX = nameX + ctx.measureText(row.name).width + 8 * scaleFactor
+    if (row.isSelf && row.name !== '我') cursorX += drawMeBadge(cursorX, ry + rowH / 2, scaleFactor) + 6 * scaleFactor
+    if (row.beaten) {
+      ctx.fillStyle = 'rgba(43,65,98,0.4)'
+      ctx.font = `${11 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+      ctx.textAlign = 'left'
+      ctx.fillText('已超越', cursorX, ry + rowH / 2)
+    }
+
+    ctx.textAlign = 'right'
+    ctx.font = `bold ${16 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+    ctx.fillStyle = row.beaten ? 'rgba(43,65,98,0.45)' : THEME_FOREST.text.dark
+    ctx.fillText(String(row.score), x + w - 14 * scaleFactor, ry + rowH / 2)
+  })
+}
+
+function renderRankPanel(scaleFactor, layout) {
+  ctx.fillStyle = 'rgba(43, 65, 98, 0.28)'
+  ctx.fillRect(0, 0, width, height)
+
+  const panelW = Math.min(width * 0.88, layout.boardSize + 28 * scaleFactor)
+  const panelH = Math.min(height * 0.72, 560 * scaleFactor)
+  const panelX = (width - panelW) / 2
+  const panelY = Math.max(layout.toolbarY + layout.pillHeight + 8 * scaleFactor, (height - panelH) / 2)
+
+  ctx.fillStyle = '#FFFEFA'
+  roundRect(ctx, panelX, panelY, panelW, panelH, 20, true)
+  rankPanelRect = { x: panelX, y: panelY, width: panelW, height: panelH }
+
+  ctx.fillStyle = THEME_FOREST.text.dark
+  ctx.font = `bold ${22 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.fillText('排行榜', width / 2, panelY + 20 * scaleFactor)
+
+  const segW = 176 * scaleFactor
+  const segH = 34 * scaleFactor
+  const segX = (width - segW) / 2
+  const tabY = panelY + 56 * scaleFactor
+  ctx.fillStyle = '#EFECE6'
+  roundRect(ctx, segX, tabY, segW, segH, segH / 2, true)
+  rankTabDailyBtn = { x: segX, y: tabY, width: segW / 2, height: segH }
+  rankTabTotalBtn = { x: segX + segW / 2, y: tabY, width: segW / 2, height: segH }
+  const active = rankTab === 'daily' ? rankTabDailyBtn : rankTabTotalBtn
+  ctx.fillStyle = THEME_FOREST.tiles['128'].background
+  roundRect(ctx, active.x + 3, active.y + 3, active.width - 6, active.height - 6, (active.height - 6) / 2, true)
+
+  const drawTabLabel = (rect, label, isActive) => {
+    ctx.fillStyle = isActive ? '#FFFFFF' : 'rgba(43,65,98,0.55)'
+    ctx.font = `500 ${14 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(label, rect.x + rect.width / 2, rect.y + rect.height / 2)
+  }
+  drawTabLabel(rankTabDailyBtn, '今日', rankTab === 'daily')
+  drawTabLabel(rankTabTotalBtn, '好友', rankTab === 'total')
+
+  let hintY = tabY + segH + 10 * scaleFactor
+  if (rankTab === 'daily' && dailyAllBeaten(loadDailyBest().s)) {
+    ctx.fillStyle = 'rgba(43,65,98,0.45)'
+    ctx.font = `${12 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+    ctx.fillText('今日挑战已全部完成', width / 2, hintY)
+    hintY += 18 * scaleFactor
+  }
+
+  const closeH = 44 * scaleFactor
+  const closeY = panelY + panelH - closeH - 16 * scaleFactor
+  const rowX = panelX + 16 * scaleFactor
+  const rowW = panelW - 32 * scaleFactor
+  const footerH = 36 * scaleFactor
+  const showAuth = rankAuthTried && !rankFriendOk
+  const authH = showAuth ? 26 * scaleFactor : 0
+  const footerY = closeY - 12 * scaleFactor - footerH - authH
+
+  rankAuthBtn = null
+  if (showAuth) {
+    const authY = footerY + footerH + 14 * scaleFactor
+    ctx.fillStyle = 'rgba(43,65,98,0.5)'
+    ctx.font = `${12 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('允许朋友信息后可看好友  去设置', width / 2, authY)
+    rankAuthBtn = { x: panelX + 36 * scaleFactor, y: authY - 13 * scaleFactor, width: panelW - 72 * scaleFactor, height: 26 * scaleFactor }
+  }
+
+  rankListRect = {
+    x: rowX,
+    y: hintY,
+    width: rowW,
+    height: Math.max(90 * scaleFactor, footerY - 8 * scaleFactor - hintY)
+  }
+
+  const odc = getOpenDataContextSafe()
+  const useOpenData = rankFriendOk && odc && odc.canvas
+  if (useOpenData) {
+    if (rankPostDirty) {
+      postRankToOpenData(rankListRect, scaleFactor)
+      rankPostDirty = false
+    }
+    try {
+      ctx.drawImage(odc.canvas, rankListRect.x, rankListRect.y, rankListRect.width, rankListRect.height)
+    } catch (e) {
+      drawRankListLocal(rankListRect.x, rankListRect.y, rankListRect.width, rankListRect.height, scaleFactor)
+    }
+  } else {
+    drawRankListLocal(rankListRect.x, rankListRect.y, rankListRect.width, rankListRect.height, scaleFactor)
+  }
+
+  const rows = localRankRows()
+  const myIndex = rows.findIndex(row => row.isSelf)
+  const myRank = myIndex >= 0 ? myIndex + 1 : '-'
+  const scoreLabel = rankTab === 'daily' ? `今日 ${playerScoreForTab()}` : `最高分 ${playerScoreForTab()}`
+  ctx.fillStyle = '#D5E3F0'
+  roundRect(ctx, rowX, footerY, rowW, footerH, 10, true)
+  ctx.fillStyle = THEME_FOREST.text.dark
+  ctx.font = `500 ${13 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(`我的 · 第${myRank}名 · ${scoreLabel}`, width / 2, footerY + footerH / 2)
+
+  ctx.fillStyle = THEME_FOREST.tiles['128'].background
+  roundRect(ctx, rowX, closeY, rowW, closeH, 12, true)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = `bold ${16 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.fillText('关闭', width / 2, closeY + closeH / 2)
+  rankCloseBtn = { x: rowX, y: closeY, width: rowW, height: closeH }
 }
 
 function renderRestartConfirm(scaleFactor) {
@@ -861,7 +1246,7 @@ function renderRestartConfirm(scaleFactor) {
   ctx.fillText('重新开始本局？', width / 2, panelY + 28 * scaleFactor)
   ctx.font = `${13 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
   ctx.fillStyle = 'rgba(43,65,98,0.7)'
-  ctx.fillText('当前分数和衔回次数会清零', width / 2, panelY + 62 * scaleFactor)
+  ctx.fillText('当前分数和撤回次数会清零', width / 2, panelY + 62 * scaleFactor)
 
   const btnW = (panelW - 48 * scaleFactor) / 2
   const btnH = 40 * scaleFactor
@@ -1009,6 +1394,41 @@ function unlockAudioIfNeeded() {
 function handleTap(endX, endY) {
   const uiElements = render()
 
+  if (showRank) {
+    if (pointInRect(endX, endY, rankTabDailyBtn) && rankTab !== 'daily') {
+      rankTab = 'daily'
+      rankPostDirty = true
+      render()
+      return true
+    }
+    if (pointInRect(endX, endY, rankTabTotalBtn) && rankTab !== 'total') {
+      rankTab = 'total'
+      rankPostDirty = true
+      render()
+      return true
+    }
+    if (pointInRect(endX, endY, rankAuthBtn)) {
+      openAuthSetting().then(ok => {
+        rankFriendOk = ok
+        if (ok) uploadRankCloud(highScore, loadDailyBest())
+        rankPostDirty = true
+        render()
+      })
+      return true
+    }
+    if (pointInRect(endX, endY, rankCloseBtn) || !pointInRect(endX, endY, rankPanelRect)) {
+      showRank = false
+      render()
+      return true
+    }
+    return true
+  }
+
+  if (pointInRect(endX, endY, uiElements.hudRankBtn)) {
+    openRankPanel()
+    return true
+  }
+
   if (gameOver && currentRestartBtn) {
     if (pointInRect(endX, endY, currentRestartBtn.restart)) {
       init()
@@ -1107,15 +1527,16 @@ wx.onTouchStart(startEvent => {
   hasMoved = false
   currentSwipe = { direction: 'none', progress: 0 }
   hudPressed = null
-  if (!gameOver && !showSettings && !showRestartConfirm) {
-    if (pointInRect(startX, startY, hudRestartBtn)) hudPressed = 'restart'
-    else if (pointInRect(startX, startY, hudSettingsBtn)) hudPressed = 'settings'
+  if (!showSettings && !showRestartConfirm && !showRank) {
+    if (!gameOver && pointInRect(startX, startY, hudRestartBtn)) hudPressed = 'restart'
+    else if (!gameOver && pointInRect(startX, startY, hudSettingsBtn)) hudPressed = 'settings'
+    else if (pointInRect(startX, startY, hudRankBtn)) hudPressed = 'rank'
     if (hudPressed) render()
   }
 })
 
 wx.onTouchMove(moveEvent => {
-  if (animating || reviveMode || gameOver || showSettings || showRestartConfirm) return
+  if (animating || reviveMode || gameOver || showSettings || showRestartConfirm || showRank) return
 
   const now = Date.now()
   const moveX = moveEvent.touches[0].clientX - startX
@@ -1183,7 +1604,7 @@ wx.onTouchEnd(endEvent => {
     return
   }
 
-  if (gameOver || showSettings || showRestartConfirm) {
+  if (gameOver || showSettings || showRestartConfirm || showRank) {
     handleTap(endX, endY)
     return
   }
@@ -1585,7 +2006,11 @@ function renderAnimalTextBox(scaleFactor) {
   roundRect(ctx, boxX, boxY, boxWidth, boxHeight, 12, false, true)
 
   ctx.fillStyle = THEME_FOREST.text.dark
-  const text = animalTexts[currentTextIndex]
+  const text = (birdToast && Date.now() < birdToast.until) ? birdToast.text : animalTexts[currentTextIndex]
+  if (birdToast && Date.now() >= birdToast.until) {
+    birdToast = null
+    showAnimalText = false
+  }
   const fontSize = (text.length > 22 ? 12 : 14) * scaleFactor
   ctx.font = `${fontSize}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
   ctx.textAlign = 'center'
@@ -1784,7 +2209,7 @@ function startMainLoop() {
       render()
       return
     }
-    if (!gameOver && !reviveMode) {
+    if (showRank || !gameOver && !reviveMode) {
       if (Date.now() - lastRenderTime > 32) {
         lastRenderTime = Date.now()
         render()
@@ -1794,10 +2219,47 @@ function startMainLoop() {
   requestAnimationFrame(tick)
 }
 
+function getShareTitle() {
+  if (score > 0) {
+    return `我在合合小鸟拿到了 ${score} 分，你也来试试？`
+  }
+  if (highScore > 0) {
+    return `合合小鸟最高分 ${highScore}，来挑战一下？`
+  }
+  return '合合小鸟，一起把格子合成 2048！'
+}
+
+function getSharePayload() {
+  return {
+    title: getShareTitle(),
+    imageUrl: SHARE_IMAGE
+  }
+}
+
+function enableShareMenu() {
+  if (typeof wx.showShareMenu !== 'function') return
+  wx.showShareMenu({
+    menus: ['shareAppMessage', 'shareTimeline']
+  })
+}
+
+function enableShare() {
+  enableShareMenu()
+  if (typeof wx.onShareAppMessage === 'function') {
+    wx.onShareAppMessage(getSharePayload)
+  }
+  if (typeof wx.onShareTimeline === 'function') {
+    wx.onShareTimeline(getSharePayload)
+  }
+}
+
 wx.onShow(() => {
   if (!audioInitialized) {
     initSounds()
   }
+  enableShareMenu()
+  syncFriendAuthSilent()
 })
 
+enableShare()
 init()
