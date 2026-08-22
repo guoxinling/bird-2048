@@ -3,7 +3,7 @@
 This file is the shared behavioral source of truth for the WeChat Mini Game and
 native iOS versions.
 
-Mini Game 1.1.0 implements the rules below. iOS may lag until it is updated;
+Mini Game 1.3.0 implements the rules below. iOS may lag until it is updated;
 document any platform deviation before changing implementation code.
 
 ## Board
@@ -31,8 +31,7 @@ document any platform deviation before changing implementation code.
 
 ## Bird Fetch (Undo)
 
-- The Mini Game grants 2 undos per game, presented as the bird "fetching back"
-  the last action.
+- The Mini Game grants 2 undos per game. Player-facing copy is `撤回上一步`.
 - An undo restores the board and score from before the last valid swipe,
   including the tile that spawned after that swipe.
 - Players may undo up to two successive moves if both charges remain.
@@ -64,3 +63,14 @@ document any platform deviation before changing implementation code.
 
 - Each platform stores the local high score.
 - Sound enabled/disabled state should also persist locally.
+
+## Ranking
+
+Ranking is Mini Game only for 1.3.0. iOS should not copy this until a native design exists.
+
+- Boards: daily and all-time.
+- Local bird challengers (菜鸟 / 勤鸟 / 老鸟) always appear.
+- Daily NPC scores are derived from the Beijing date; all-time NPC scores scale with the player's high-score band.
+- Surpassed NPCs stay on the list and are marked 已超越.
+- WeChat friend rows use hosted cloud storage and require `scope.WxFriendInteraction`.
+- Friend scores never leave the Open Data Context.
