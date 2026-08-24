@@ -196,32 +196,18 @@ export function checkFriendAuthSilent() {
 
 export function requestFriendAuth() {
   return new Promise(resolve => {
-    let settled = false
-    const done = ok => {
-      if (settled) return
-      settled = true
-      resolve(!!ok)
-    }
-
-    if (typeof wx.requirePrivacyAuthorize === 'function') {
-      wx.requirePrivacyAuthorize({
-        success() {},
-        fail() {}
-      })
-    }
-
     if (typeof wx.authorize !== 'function') {
-      done(false)
+      resolve(false)
       return
     }
 
-    // 必须在点击同步栈里调用，前面不能先 getSetting，否则真机不弹窗
+    // 必须在点击同步栈里立刻调用。前面不能 getSetting / requirePrivacyAuthorize，否则真机不弹窗。
     wx.authorize({
       scope: 'scope.WxFriendInteraction',
-      success: () => done(true),
+      success: () => resolve(true),
       fail: err => {
         console.warn('朋友信息授权失败', err)
-        done(false)
+        resolve(false)
       }
     })
   })

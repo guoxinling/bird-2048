@@ -14,7 +14,7 @@ import {
   uploadRankCloud
 } from './js/rank.js'
 
-const APP_VERSION = '1.3.0'
+const APP_VERSION = '1.3.1'
 const SHARE_IMAGE = 'images/share.jpg'
 
 const MAX_UNDOS = 2
@@ -185,6 +185,7 @@ let showRank = false
 let rankTab = 'daily'
 let rankFriendOk = false
 let rankAuthTried = false
+let friendAuthInflight = null
 let rankCloseBtn = null
 let rankTabDailyBtn = null
 let rankTabTotalBtn = null
@@ -312,7 +313,7 @@ function updateScore(value) {
   dailyBest = saveDailyBest(score)
   if (dailyBest.s > oldDaily) noteNpcBeats('daily', dailyBest.s)
   if (highScore > oldHigh) noteNpcBeats('total', highScore)
-  if (rankFriendOk) uploadRankCloud(highScore, dailyBest)
+  uploadRankCloud(highScore, dailyBest)
 }
 
 function init() {
@@ -368,7 +369,7 @@ function init() {
 
   dailyBest = loadDailyBest()
   if (score > 0) dailyBest = saveDailyBest(score)
-  syncFriendAuthSilent()
+  uploadRankCloud(highScore, dailyBest)
 }
 
 function loadAnimalImage() {
@@ -994,10 +995,45 @@ function noteNpcBeats(tab, playerScore) {
 }
 
 function syncFriendAuthSilent() {
+  if (!rankAuthTried) return
   checkFriendAuthSilent().then(ok => {
     rankFriendOk = ok
-    if (ok) uploadRankCloud(highScore, loadDailyBest())
+    uploadRankCloud(highScore, loadDailyBest())
+    if (showRank) {
+      rankPostDirty = true
+      render()
+    }
   })
+}
+
+function ensureFriendAuth() {
+  if (rankFriendOk) {
+    uploadRankCloud(highScore, loadDailyBest())
+    return
+  }
+  if (friendAuthInflight) return
+  friendAuthInflight = requestFriendAuth().then(ok => {
+    friendAuthInflight = null
+    rankFriendOk = ok
+    rankAuthTried = true
+    uploadRankCloud(highScore, loadDailyBest())
+    if (showRank) {
+      rankPostDirty = true
+      render()
+    }
+  })
+}
+
+function openRankPanel() {
+  ensureFriendAuth()
+  showRank = true
+  showSettings = false
+  showRestartConfirm = false
+  showAssistPanel = false
+  showAnimalText = false
+  rankTab = 'daily'
+  rankPostDirty = true
+  render()
 }
 
 function playerScoreForTab() {
@@ -1037,25 +1073,6 @@ function postRankToOpenData(listRect, scaleFactor) {
     height: listRect.height,
     dpr
   })
-}
-
-function openRankPanel() {
-  showRank = true
-  showSettings = false
-  showRestartConfirm = false
-  showAssistPanel = false
-  showAnimalText = false
-  rankTab = 'daily'
-  rankPostDirty = true
-  rankAuthTried = false
-  requestFriendAuth().then(ok => {
-    rankFriendOk = ok
-    rankAuthTried = true
-    if (ok) uploadRankCloud(highScore, loadDailyBest())
-    rankPostDirty = true
-    render()
-  })
-  render()
 }
 
 function drawMeBadge(x, y, scaleFactor) {
@@ -1193,7 +1210,7 @@ function renderRankPanel(scaleFactor, layout) {
     ctx.fillText(label, rect.x + rect.width / 2, rect.y + rect.height / 2)
   }
   drawTabLabel(rankTabDailyBtn, '今日', rankTab === 'daily')
-  drawTabLabel(rankTabTotalBtn, '好友', rankTab === 'total')
+  drawTabLabel(rankTabTotalBtn, '总榜', rankTab === 'total')
 
   let hintY = tabY + segH + 10 * scaleFactor
   if (rankTab === 'daily' && dailyAllBeaten(loadDailyBest().s)) {
@@ -1221,7 +1238,7 @@ function renderRankPanel(scaleFactor, layout) {
     ctx.font = `${12 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText('允许朋友信息后可看好友  去设置', width / 2, authY)
+    ctx.fillText('允许朋友信息后可看总榜  去设置', width / 2, authY)
     rankAuthBtn = { x: panelX + 36 * scaleFactor, y: authY - 13 * scaleFactor, width: panelW - 72 * scaleFactor, height: 26 * scaleFactor }
   }
 
@@ -1433,8 +1450,6 @@ function unlockAudioIfNeeded() {
 }
 
 function handleTap(endX, endY) {
-  const uiElements = render()
-
   if (showRank) {
     if (pointInRect(endX, endY, rankTabDailyBtn) && rankTab !== 'daily') {
       rankTab = 'daily'
@@ -1451,7 +1466,8 @@ function handleTap(endX, endY) {
     if (pointInRect(endX, endY, rankAuthBtn)) {
       openAuthSetting().then(ok => {
         rankFriendOk = ok
-        if (ok) uploadRankCloud(highScore, loadDailyBest())
+        rankAuthTried = true
+        uploadRankCloud(highScore, loadDailyBest())
         rankPostDirty = true
         render()
       })
@@ -1465,10 +1481,12 @@ function handleTap(endX, endY) {
     return true
   }
 
-  if (pointInRect(endX, endY, uiElements.hudRankBtn)) {
+  if (pointInRect(endX, endY, hudRankBtn)) {
     openRankPanel()
     return true
   }
+
+  const uiElements = render()
 
   if (gameOver && currentRestartBtn) {
     if (pointInRect(endX, endY, currentRestartBtn.restart)) {
@@ -1571,7 +1589,10 @@ wx.onTouchStart(startEvent => {
   if (!showSettings && !showRestartConfirm && !showRank) {
     if (!gameOver && pointInRect(startX, startY, hudRestartBtn)) hudPressed = 'restart'
     else if (!gameOver && pointInRect(startX, startY, hudSettingsBtn)) hudPressed = 'settings'
-    else if (pointInRect(startX, startY, hudRankBtn)) hudPressed = 'rank'
+    else if (pointInRect(startX, startY, hudRankBtn)) {
+      hudPressed = 'rank'
+      ensureFriendAuth()
+    }
     if (hudPressed) render()
   }
 })
@@ -2299,6 +2320,7 @@ wx.onShow(() => {
     initSounds()
   }
   enableShareMenu()
+  uploadRankCloud(highScore, loadDailyBest())
   syncFriendAuthSilent()
 })
 

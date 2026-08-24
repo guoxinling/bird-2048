@@ -3,7 +3,7 @@
 This file is the shared behavioral source of truth for the WeChat Mini Game and
 native iOS versions.
 
-Mini Game 1.3.0 implements the rules below. iOS may lag until it is updated;
+Mini Game 1.3.1 implements the rules below. iOS may lag until it is updated;
 document any platform deviation before changing implementation code.
 
 ## Board
@@ -66,7 +66,7 @@ document any platform deviation before changing implementation code.
 
 ## Ranking
 
-Ranking is Mini Game only for 1.3.0. iOS should not copy this until a native design exists.
+Ranking is Mini Game only for 1.3.1. iOS should not copy this until a native design exists.
 
 - Boards: daily and all-time.
 - Local bird challengers (菜鸟 / 勤鸟 / 老鸟) always appear.
