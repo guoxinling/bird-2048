@@ -91,6 +91,12 @@ let crownLoaded = false
 const bgImage = wx.createImage()
 let bgLoaded = false
 
+const hudIconImages = {
+  trophy: wx.createImage(),
+  refresh: wx.createImage()
+}
+const hudIconLoaded = {}
+
 const animalTexts = [
   '点我可以撤回上一步，每局两次哦！',
   '误滑了别慌，点我就能撤回~',
@@ -342,6 +348,7 @@ function init() {
   loadRankBirdImage()
   loadBackgroundImage()
   loadCrownImage()
+  loadHudIcons()
 
   addRandomNumber()
   addRandomNumber()
@@ -754,7 +761,7 @@ function drawScorePopup(cardX, cardY, cardWidth, scaleFactor) {
 }
 
 function drawHudButton(anchorX, y, h, label, icon, iconGap, scaleFactor, pressed, fromLeft) {
-  const iconSize = 14 * scaleFactor
+  const iconSize = 16 * scaleFactor
   const fontSize = 13 * scaleFactor
   const padX = 13 * scaleFactor
   const radius = h / 2
@@ -802,7 +809,7 @@ function drawHudButton(anchorX, y, h, label, icon, iconGap, scaleFactor, pressed
 
   const contentX = x + padX
   const midY = y + h / 2
-  drawHudIcon(icon, contentX + iconSize / 2, midY, iconSize, color, 1.5 * scaleFactor)
+  drawHudIcon(icon, contentX + iconSize / 2, midY, iconSize, color)
 
   ctx.fillStyle = color
   ctx.font = `500 ${fontSize}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
@@ -814,68 +821,102 @@ function drawHudButton(anchorX, y, h, label, icon, iconGap, scaleFactor, pressed
   return { x, y, width: w, height: h }
 }
 
-function drawHudIcon(type, cx, cy, size, color, lineW) {
+const HUD_ICONS = {
+  trophy: {
+    paths: [
+      'M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2',
+      'M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2',
+      'M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3',
+      'M4 22h16',
+      'M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z',
+      'M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3'
+    ]
+  },
+  refresh: {
+    paths: [
+      'M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8',
+      'M21 3v5h-5'
+    ]
+  },
+  gear: {
+    paths: [
+      'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'
+    ],
+    circles: [{ cx: 12, cy: 12, r: 4 }]
+  }
+}
+
+function loadHudIcons() {
+  const files = {
+    trophy: 'images/icon-trophy.png',
+    refresh: 'images/icon-refresh.png'
+  }
+  Object.keys(files).forEach((key) => {
+    hudIconImages[key].src = files[key]
+    hudIconImages[key].onload = function () {
+      hudIconLoaded[key] = true
+      render()
+    }
+  })
+}
+
+function drawBoltIcon(cx, cy, size, color) {
   ctx.save()
+  ctx.translate(cx - size / 2, cy - size / 2)
+  ctx.scale(size / 24, size / 24)
   ctx.strokeStyle = color
-  ctx.fillStyle = color
-  ctx.lineWidth = lineW
+  ctx.lineWidth = 2
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  if (type === 'refresh') {
-    const r = size * 0.32
-    const start = Math.PI * 0.35
-    const end = Math.PI * 1.95
+
+  ctx.beginPath()
+  ctx.moveTo(12, 2.27)
+  ctx.lineTo(20, 6.27)
+  ctx.lineTo(20, 17.73)
+  ctx.lineTo(12, 21.73)
+  ctx.lineTo(4, 17.73)
+  ctx.lineTo(4, 6.27)
+  ctx.closePath()
+  ctx.stroke()
+
+  ctx.beginPath()
+  ctx.arc(12, 12, 4, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.restore()
+}
+
+function drawHudIcon(type, cx, cy, size, color) {
+  if (type === 'gear') {
+    drawBoltIcon(cx, cy, size, color)
+    return
+  }
+
+  const img = hudIconImages[type]
+  if (img && hudIconLoaded[type]) {
+    ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size)
+    return
+  }
+
+  const icon = HUD_ICONS[type]
+  if (!icon || typeof Path2D !== 'function') return
+
+  ctx.save()
+  ctx.translate(cx - size / 2, cy - size / 2)
+  ctx.scale(size / 24, size / 24)
+  ctx.strokeStyle = color
+  ctx.lineWidth = 2
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.miterLimit = 2
+  for (let i = 0; i < icon.paths.length; i++) {
+    ctx.stroke(new Path2D(icon.paths[i]))
+  }
+  const circles = icon.circles || []
+  for (let i = 0; i < circles.length; i++) {
+    const c = circles[i]
     ctx.beginPath()
-    ctx.arc(cx, cy, r, start, end, false)
+    ctx.arc(c.cx, c.cy, c.r, 0, Math.PI * 2)
     ctx.stroke()
-    const ax = cx + r * Math.cos(end)
-    const ay = cy + r * Math.sin(end)
-    const ah = size * 0.22
-    const ang = end + Math.PI / 2
-    ctx.beginPath()
-    ctx.moveTo(ax + Math.cos(ang - 0.9) * ah, ay + Math.sin(ang - 0.9) * ah)
-    ctx.lineTo(ax, ay)
-    ctx.lineTo(ax + Math.cos(ang + 2.4) * ah * 0.55, ay + Math.sin(ang + 2.4) * ah * 0.55)
-    ctx.stroke()
-  } else if (type === 'trophy') {
-    const top = cy - size * 0.28
-    const bot = cy + size * 0.06
-    ctx.beginPath()
-    ctx.moveTo(cx - size * 0.2, top)
-    ctx.lineTo(cx + size * 0.2, top)
-    ctx.lineTo(cx + size * 0.14, bot)
-    ctx.lineTo(cx - size * 0.14, bot)
-    ctx.closePath()
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.arc(cx - size * 0.2, top + size * 0.12, size * 0.1, Math.PI * 0.45, Math.PI * 1.55)
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.arc(cx + size * 0.2, top + size * 0.12, size * 0.1, -Math.PI * 0.55, Math.PI * 0.55)
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.moveTo(cx, bot)
-    ctx.lineTo(cx, cy + size * 0.22)
-    ctx.moveTo(cx - size * 0.13, cy + size * 0.22)
-    ctx.lineTo(cx + size * 0.13, cy + size * 0.22)
-    ctx.stroke()
-  } else {
-    const hole = size * 0.14
-    const ring = size * 0.26
-    const tooth = size * 0.16
-    ctx.beginPath()
-    ctx.arc(cx, cy, hole, 0, Math.PI * 2)
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.arc(cx, cy, ring, 0, Math.PI * 2)
-    ctx.stroke()
-    for (let i = 0; i < 6; i++) {
-      const a = i * Math.PI / 3
-      ctx.beginPath()
-      ctx.moveTo(cx + Math.cos(a) * ring, cy + Math.sin(a) * ring)
-      ctx.lineTo(cx + Math.cos(a) * (ring + tooth), cy + Math.sin(a) * (ring + tooth))
-      ctx.stroke()
-    }
   }
   ctx.restore()
 }
