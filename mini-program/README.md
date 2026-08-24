@@ -12,7 +12,7 @@ This is the existing WeChat Mini Game version.
 
 Open the `mini-program/` directory (not the repository root).
 
-## Current Status (v1.3.1)
+## Current Status (v1.4.0)
 
 UI refresh on top of the 1.1.0 play-feel rules, plus share and ranking:
 
@@ -24,6 +24,7 @@ UI refresh on top of the 1.1.0 play-feel rules, plus share and ranking:
 6. Capsule forward menu is enabled, with a custom 5:4 share card.
 7. Daily / all-time ranking with bird challengers; WeChat friends appear after friend-info auth.
 8. Friend auth is requested on the rank-button tap, and scores upload even before auth so friends can see each other once both sides allow it.
+9. Board tiles 2–2048 show the iOS bird sprites plus the number. 4096+ stay number-only until art exists.
 
 Rules live in `../shared/game-rules.md`.
 

@@ -14,7 +14,7 @@ import {
   uploadRankCloud
 } from './js/rank.js'
 
-const APP_VERSION = '1.3.1'
+const APP_VERSION = '1.4.0'
 const SHARE_IMAGE = 'images/share.jpg'
 
 const MAX_UNDOS = 2
@@ -96,6 +96,10 @@ const hudIconImages = {
   refresh: wx.createImage()
 }
 const hudIconLoaded = {}
+
+const TILE_BIRD_VALUES = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+const tileBirdImages = {}
+const tileBirdLoaded = {}
 
 const animalTexts = [
   '点我可以撤回上一步，每局两次哦！',
@@ -350,6 +354,7 @@ function init() {
   loadBackgroundImage()
   loadCrownImage()
   loadHudIcons()
+  loadTileBirdImages()
 
   addRandomNumber()
   addRandomNumber()
@@ -861,6 +866,18 @@ function loadHudIcons() {
   })
 }
 
+function loadTileBirdImages() {
+  TILE_BIRD_VALUES.forEach(value => {
+    const img = wx.createImage()
+    tileBirdImages[value] = img
+    img.onload = function () {
+      tileBirdLoaded[value] = true
+      render()
+    }
+    img.src = `images/tile-bird-${value}.png`
+  })
+}
+
 function drawBoltIcon(cx, cy, size, color) {
   ctx.save()
   ctx.translate(cx - size / 2, cy - size / 2)
@@ -1338,12 +1355,32 @@ function drawTile(x, y, size, value, scale = 1) {
   ctx.fillStyle = style.background
   roundRect(ctx, -size / 2, -size / 2, size, size, 6, true)
 
-  const fontSize = value < 100 ? size / 2 : value < 1000 ? size / 2.5 : size / 3.2
-  ctx.fillStyle = style.text
-  ctx.font = `bold ${fontSize}px 'Helvetica Neue', Arial, sans-serif`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(String(value), 0, 0)
+  const birdImg = tileBirdImages[value]
+  if (birdImg && tileBirdLoaded[value]) {
+    const birdSize = size * 0.84
+    ctx.drawImage(birdImg, -birdSize / 2, -size / 2 + size * 0.02, birdSize, birdSize)
+
+    const label = String(value)
+    const fontSize = label.length >= 4 ? size * 0.17 : size * 0.2
+    ctx.font = `bold ${fontSize}px 'Helvetica Neue', Arial, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.lineJoin = 'round'
+    ctx.miterLimit = 2
+    ctx.lineWidth = Math.max(2.4, size * 0.05)
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)'
+    const ly = size / 2 - fontSize * 0.68
+    ctx.strokeText(label, 0, ly)
+    ctx.fillStyle = value === 2048 ? '#F08A2A' : '#3D4A5C'
+    ctx.fillText(label, 0, ly)
+  } else {
+    const fontSize = value < 100 ? size / 2 : value < 1000 ? size / 2.5 : size / 3.2
+    ctx.fillStyle = style.text
+    ctx.font = `bold ${fontSize}px 'Helvetica Neue', Arial, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(value), 0, 0)
+  }
   ctx.restore()
 }
 
