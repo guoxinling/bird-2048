@@ -181,6 +181,26 @@ export function uploadRankCloud(highScore, dailyBest) {
   })
 }
 
+export function requestPrivacyAuth() {
+  return new Promise(resolve => {
+    if (typeof wx.requirePrivacyAuthorize !== 'function') {
+      resolve(true)
+      return
+    }
+    wx.requirePrivacyAuthorize({
+      success: () => resolve(true),
+      fail: () => resolve(false)
+    })
+  })
+}
+
+export function openPrivacyContract() {
+  if (typeof wx.openPrivacyContract !== 'function') return
+  wx.openPrivacyContract({
+    fail: err => console.warn('打开隐私指引失败', err)
+  })
+}
+
 export function checkFriendAuthSilent() {
   return new Promise(resolve => {
     if (typeof wx.getSetting !== 'function') {

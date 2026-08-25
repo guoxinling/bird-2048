@@ -9,12 +9,14 @@ import {
   getBeijingDate,
   loadDailyBest,
   openAuthSetting,
+  openPrivacyContract,
   requestFriendAuth,
+  requestPrivacyAuth,
   saveDailyBest,
   uploadRankCloud
 } from './js/rank.js'
 
-const APP_VERSION = '1.4.0'
+const APP_VERSION = '1.4.1'
 const SHARE_IMAGE = 'images/share.jpg'
 
 const MAX_UNDOS = 2
@@ -190,6 +192,8 @@ let rankTab = 'daily'
 let rankFriendOk = false
 let rankAuthTried = false
 let friendAuthInflight = null
+let privacyOk = false
+let privacyInflight = null
 let rankCloseBtn = null
 let rankTabDailyBtn = null
 let rankTabTotalBtn = null
@@ -200,6 +204,7 @@ let rankPostDirty = true
 let birdToast = null
 let dailyBest = { d: '', s: 0 }
 let settingsSoundBtn = null
+let settingsPrivacyBtn = null
 let settingsCloseBtn = null
 let confirmOkBtn = null
 let confirmCancelBtn = null
@@ -317,7 +322,7 @@ function updateScore(value) {
   dailyBest = saveDailyBest(score)
   if (dailyBest.s > oldDaily) noteNpcBeats('daily', dailyBest.s)
   if (highScore > oldHigh) noteNpcBeats('total', highScore)
-  uploadRankCloud(highScore, dailyBest)
+  uploadRankIfAllowed(highScore, dailyBest)
 }
 
 function init() {
@@ -374,7 +379,7 @@ function init() {
 
   dailyBest = loadDailyBest()
   if (score > 0) dailyBest = saveDailyBest(score)
-  uploadRankCloud(highScore, dailyBest)
+  ensurePrivacy()
 }
 
 function loadAnimalImage() {
@@ -581,6 +586,7 @@ function render(swipe = null) {
     renderSettingsPanel(scaleFactor)
   } else {
     settingsSoundBtn = null
+    settingsPrivacyBtn = null
     settingsCloseBtn = null
   }
 
@@ -944,7 +950,7 @@ function renderSettingsPanel(scaleFactor) {
   ctx.fillRect(0, 0, width, height)
 
   const panelW = width * 0.78
-  const panelH = 248 * scaleFactor
+  const panelH = 300 * scaleFactor
   const panelX = (width - panelW) / 2
   const panelY = (height - panelH) / 2
 
@@ -972,14 +978,24 @@ function renderSettingsPanel(scaleFactor) {
   ctx.fillStyle = soundEnabled ? THEME_FOREST.tiles['128'].background : THEME_FOREST.text.dark
   ctx.fillText(soundEnabled ? '开' : '关', rowX + rowW - 14 * scaleFactor, soundY + rowH / 2)
 
+  const privacyY = soundY + rowH + 12 * scaleFactor
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'
+  roundRect(ctx, rowX, privacyY, rowW, rowH, 10, true)
+  ctx.fillStyle = THEME_FOREST.text.dark
+  ctx.textAlign = 'left'
+  ctx.fillText('隐私保护指引', rowX + 14 * scaleFactor, privacyY + rowH / 2)
+  ctx.textAlign = 'right'
+  ctx.fillStyle = THEME_FOREST.tiles['128'].background
+  ctx.fillText('查看', rowX + rowW - 14 * scaleFactor, privacyY + rowH / 2)
+
   ctx.fillStyle = 'rgba(43,65,98,0.45)'
   ctx.font = `${13 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(`版本 v${APP_VERSION}`, width / 2, panelY + 128 * scaleFactor)
+  ctx.fillText(`版本 v${APP_VERSION}`, width / 2, panelY + 186 * scaleFactor)
   ctx.font = `${12 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
   ctx.fillStyle = 'rgba(43,65,98,0.4)'
-  ctx.fillText('此产品由iTab新标签页团队开发。', width / 2, panelY + 150 * scaleFactor)
+  ctx.fillText('此产品由iTab新标签页团队开发。', width / 2, panelY + 208 * scaleFactor)
 
   const closeW = rowW
   const closeH = 40 * scaleFactor
@@ -992,6 +1008,7 @@ function renderSettingsPanel(scaleFactor) {
   ctx.fillText('关闭', width / 2, closeY + closeH / 2)
 
   settingsSoundBtn = { x: rowX, y: soundY, width: rowW, height: rowH }
+  settingsPrivacyBtn = { x: rowX, y: privacyY, width: rowW, height: rowH }
   settingsCloseBtn = { x: rowX, y: closeY, width: closeW, height: closeH }
 }
 
@@ -1011,11 +1028,31 @@ function noteNpcBeats(tab, playerScore) {
   triggerBirdEvent('hop')
 }
 
+function uploadRankIfAllowed(highScore, dailyBest) {
+  if (!privacyOk) return
+  uploadRankCloud(highScore, dailyBest)
+}
+
+function ensurePrivacy() {
+  if (privacyOk) {
+    uploadRankIfAllowed(highScore, loadDailyBest())
+    return Promise.resolve(true)
+  }
+  if (privacyInflight) return privacyInflight
+  privacyInflight = requestPrivacyAuth().then(ok => {
+    privacyInflight = null
+    privacyOk = !!ok
+    if (privacyOk) uploadRankCloud(highScore, loadDailyBest())
+    return privacyOk
+  })
+  return privacyInflight
+}
+
 function syncFriendAuthSilent() {
   if (!rankAuthTried) return
   checkFriendAuthSilent().then(ok => {
     rankFriendOk = ok
-    uploadRankCloud(highScore, loadDailyBest())
+    uploadRankIfAllowed(highScore, loadDailyBest())
     if (showRank) {
       rankPostDirty = true
       render()
@@ -1024,8 +1061,12 @@ function syncFriendAuthSilent() {
 }
 
 function ensureFriendAuth() {
+  if (!privacyOk) {
+    ensurePrivacy()
+    return
+  }
   if (rankFriendOk) {
-    uploadRankCloud(highScore, loadDailyBest())
+    uploadRankIfAllowed(highScore, loadDailyBest())
     return
   }
   if (friendAuthInflight) return
@@ -1033,7 +1074,7 @@ function ensureFriendAuth() {
     friendAuthInflight = null
     rankFriendOk = ok
     rankAuthTried = true
-    uploadRankCloud(highScore, loadDailyBest())
+    uploadRankIfAllowed(highScore, loadDailyBest())
     if (showRank) {
       rankPostDirty = true
       render()
@@ -1504,7 +1545,7 @@ function handleTap(endX, endY) {
       openAuthSetting().then(ok => {
         rankFriendOk = ok
         rankAuthTried = true
-        uploadRankCloud(highScore, loadDailyBest())
+        uploadRankIfAllowed(highScore, loadDailyBest())
         rankPostDirty = true
         render()
       })
@@ -1556,6 +1597,10 @@ function handleTap(endX, endY) {
     if (pointInRect(endX, endY, settingsSoundBtn)) {
       toggleSound()
       render()
+      return true
+    }
+    if (pointInRect(endX, endY, settingsPrivacyBtn)) {
+      openPrivacyContract()
       return true
     }
     showSettings = false
@@ -1618,6 +1663,7 @@ function handleTap(endX, endY) {
 
 wx.onTouchStart(startEvent => {
   unlockAudioIfNeeded()
+  if (!privacyOk) ensurePrivacy()
   startX = startEvent.touches[0].clientX
   startY = startEvent.touches[0].clientY
   hasMoved = false
@@ -1628,7 +1674,7 @@ wx.onTouchStart(startEvent => {
     else if (!gameOver && pointInRect(startX, startY, hudSettingsBtn)) hudPressed = 'settings'
     else if (pointInRect(startX, startY, hudRankBtn)) {
       hudPressed = 'rank'
-      ensureFriendAuth()
+      if (privacyOk) ensureFriendAuth()
     }
     if (hudPressed) render()
   }
@@ -2357,7 +2403,7 @@ wx.onShow(() => {
     initSounds()
   }
   enableShareMenu()
-  uploadRankCloud(highScore, loadDailyBest())
+  ensurePrivacy()
   syncFriendAuthSilent()
 })
 
