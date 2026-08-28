@@ -10,8 +10,8 @@ The Mini Game currently includes:
 - `mini-program/images/bg.jpg`
 - `mini-program/images/share.jpg`
 - `mini-program/images/store-cover.jpg`
-- `mini-program/images/tile-bird-{2,4,8,16,32,64,128,256,512,1024,2048}.png`
-  (compressed 192px copies of iOS `bird_level_*`; originals stay in the iOS asset catalog)
+- `mini-program/images/tile-bird-{2,4,8,16,32,64,128,256,512,1024,2048,4096}.png`
+  (compressed 192px copies of the iOS bird art; originals stay in the iOS asset catalog / design-assets)
 - `mini-program/audio/bird.mp3`
 - `mini-program/audio/move.mp3`
 - `mini-program/audio/merge.mp3`

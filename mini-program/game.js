@@ -16,12 +16,13 @@ import {
   uploadRankCloud
 } from './js/rank.js'
 
-const APP_VERSION = '1.4.1'
+const APP_VERSION = '1.5.0'
 const SHARE_IMAGE = 'images/share.jpg'
 
 const MAX_UNDOS = 2
 const MAX_REVIVES = 1
-const MILESTONES = [512, 1024, 2048]
+const MILESTONES = [512, 1024, 2048, 4096]
+const WIN_TILE = 4096
 const SLIDE_MS = 140
 const SPAWN_START_MS = 80
 const SPAWN_MS = 100
@@ -94,12 +95,11 @@ const bgImage = wx.createImage()
 let bgLoaded = false
 
 const hudIconImages = {
-  trophy: wx.createImage(),
-  refresh: wx.createImage()
+  trophy: wx.createImage()
 }
 const hudIconLoaded = {}
 
-const TILE_BIRD_VALUES = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+const TILE_BIRD_VALUES = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
 const tileBirdImages = {}
 const tileBirdLoaded = {}
 
@@ -133,7 +133,7 @@ const THEME_FOREST = {
     '512': { background: '#D9C8AE', text: '#5E503F' },
     '1024': { background: '#FFBF9B', text: '#704E3D' },
     '2048': { background: '#FFA8A8', text: '#6D4C41' },
-    '4096': { background: '#FF7B7B', text: '#FFFFFF' },
+    '4096': { background: '#FFE7B0', text: '#6D4C41' },
     '8192': { background: '#E85D5D', text: '#FFFFFF' }
   },
   score: {
@@ -170,6 +170,7 @@ let score = 0
 let highScore = 0
 let gameOver = false
 let gameWon = false
+let showWinModal = false
 
 let reviveMode = false
 let canRevive = MAX_REVIVES
@@ -293,6 +294,7 @@ function captureSnapshot() {
     score,
     gameOver,
     gameWon,
+    showWinModal,
     reachedMilestones: Array.from(reachedMilestones)
   }
 }
@@ -303,6 +305,7 @@ function restoreSnapshot(snapshot) {
   displayScore = snapshot.score
   gameOver = snapshot.gameOver
   gameWon = snapshot.gameWon
+  showWinModal = snapshot.showWinModal
   reachedMilestones = new Set(snapshot.reachedMilestones)
 }
 
@@ -336,6 +339,7 @@ function init() {
   displayScore = 0
   gameOver = false
   gameWon = false
+  showWinModal = false
   canRevive = MAX_REVIVES
   reviveMode = false
   undoLeft = MAX_UNDOS
@@ -502,13 +506,13 @@ function render(swipe = null) {
   if (!reviveMode && animalLoaded) {
     animalArea = drawBird(scaleFactor)
 
-    if (showAssistPanel && canFetchUndo() && !gameOver && !showSettings && !showRestartConfirm && !showRank) {
+    if (showAssistPanel && canFetchUndo() && !gameOver && !showWinModal && !showSettings && !showRestartConfirm && !showRank) {
       renderAssistPanel(scaleFactor, animalArea)
     } else {
       assistUndoBtn = null
     }
 
-    if ((showAnimalText || (birdToast && Date.now() < birdToast.until)) && !gameOver && !showSettings && !showRestartConfirm && !showRank) {
+    if ((showAnimalText || (birdToast && Date.now() < birdToast.until)) && !gameOver && !showWinModal && !showSettings && !showRestartConfirm && !showRank) {
       renderAnimalTextBox(scaleFactor)
     }
   } else {
@@ -569,20 +573,22 @@ function render(swipe = null) {
     renderReviveInstructions(layout)
   }
 
-  if (gameOver) {
-    currentRestartBtn = renderGameOverModal()
+  if (showWinModal && !animating) {
+    currentRestartBtn = renderWinModal(scaleFactor)
+  } else if (gameOver && !animating) {
+    currentRestartBtn = renderGameOverModal(scaleFactor)
   } else {
     currentRestartBtn = null
   }
 
-  if (showRestartConfirm && !gameOver) {
+  if (showRestartConfirm && !gameOver && !showWinModal) {
     renderRestartConfirm(scaleFactor)
   } else {
     confirmOkBtn = null
     confirmCancelBtn = null
   }
 
-  if (showSettings && !gameOver && !showRank) {
+  if (showSettings && !gameOver && !showWinModal && !showRank) {
     renderSettingsPanel(scaleFactor)
   } else {
     settingsSoundBtn = null
@@ -602,11 +608,11 @@ function render(swipe = null) {
   }
 
   return {
-    animalBtn: gameOver || reviveMode || showSettings || showRestartConfirm || showRank ? null : animalArea,
+    animalBtn: gameOver || showWinModal || reviveMode || showSettings || showRestartConfirm || showRank ? null : animalArea,
     assistUndoBtn,
-    hudRestartBtn: gameOver || showRank ? null : hudRestartBtn,
-    hudSettingsBtn: gameOver || showRank ? null : hudSettingsBtn,
-    hudRankBtn: showSettings || showRestartConfirm || showRank ? null : hudRankBtn
+    hudRestartBtn: gameOver || showWinModal || showRank ? null : hudRestartBtn,
+    hudSettingsBtn: gameOver || showWinModal || showRank ? null : hudSettingsBtn,
+    hudRankBtn: showSettings || showRestartConfirm || showRank || gameOver || showWinModal ? null : hudRankBtn
   }
 }
 
@@ -616,7 +622,7 @@ function drawBird(scaleFactor) {
   const animalY = Math.floor(height - animalSize - 24 * scaleFactor)
   const area = { x: animalX, y: animalY, width: animalSize, height: animalSize }
   const now = Date.now()
-  const idle = !gameOver && !reviveMode
+  const idle = !gameOver && !showWinModal && !reviveMode
   let bob = idle ? Math.sin(now / 800) * 4 : 0
   let tilt = idle ? Math.sin(now / 1600) * 2 * Math.PI / 180 : 0
   let squash = 1
@@ -860,15 +866,15 @@ const HUD_ICONS = {
 
 function loadHudIcons() {
   const files = {
-    trophy: 'images/icon-trophy.png',
-    refresh: 'images/icon-refresh.png'
+    trophy: 'images/icon-trophy.png'
   }
   Object.keys(files).forEach((key) => {
-    hudIconImages[key].src = files[key]
-    hudIconImages[key].onload = function () {
+    const img = hudIconImages[key]
+    img.onload = function () {
       hudIconLoaded[key] = true
       render()
     }
+    img.src = files[key]
   })
 }
 
@@ -909,9 +915,34 @@ function drawBoltIcon(cx, cy, size, color) {
   ctx.restore()
 }
 
+function drawRefreshIcon(cx, cy, size, color) {
+  ctx.save()
+  ctx.translate(cx - size / 2, cy - size / 2)
+  ctx.scale(size / 24, size / 24)
+  ctx.strokeStyle = color
+  ctx.lineWidth = 2
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+
+  ctx.beginPath()
+  ctx.arc(12, 12, 8, -Math.PI * 0.35, Math.PI * 1.45, false)
+  ctx.stroke()
+
+  ctx.beginPath()
+  ctx.moveTo(19.6, 2.8)
+  ctx.lineTo(19.6, 8.4)
+  ctx.lineTo(14, 8.4)
+  ctx.stroke()
+  ctx.restore()
+}
+
 function drawHudIcon(type, cx, cy, size, color) {
   if (type === 'gear') {
     drawBoltIcon(cx, cy, size, color)
+    return
+  }
+  if (type === 'refresh') {
+    drawRefreshIcon(cx, cy, size, color)
     return
   }
 
@@ -1412,7 +1443,7 @@ function drawTile(x, y, size, value, scale = 1) {
     ctx.strokeStyle = 'rgba(255,255,255,0.95)'
     const ly = size / 2 - fontSize * 0.68
     ctx.strokeText(label, 0, ly)
-    ctx.fillStyle = value === 2048 ? '#F08A2A' : '#3D4A5C'
+    ctx.fillStyle = value >= 2048 ? '#F08A2A' : '#3D4A5C'
     ctx.fillText(label, 0, ly)
   } else {
     const fontSize = value < 100 ? size / 2 : value < 1000 ? size / 2.5 : size / 3.2
@@ -1455,53 +1486,160 @@ function roundRect(context, x, y, w, h, radius, fill, stroke) {
   context.restore()
 }
 
-function renderGameOverModal() {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
-  ctx.fillRect(0, 0, width, height)
+function drawSparkle(x, y, size, color) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.moveTo(0, -size)
+  ctx.lineTo(size * 0.22, -size * 0.22)
+  ctx.lineTo(size, 0)
+  ctx.lineTo(size * 0.22, size * 0.22)
+  ctx.lineTo(0, size)
+  ctx.lineTo(-size * 0.22, size * 0.22)
+  ctx.lineTo(-size, 0)
+  ctx.lineTo(-size * 0.22, -size * 0.22)
+  ctx.closePath()
+  ctx.fill()
+  ctx.restore()
+}
 
-  const modalWidth = width * 0.8
-  const modalHeight = height * 0.5
-  const modalX = (width - modalWidth) / 2
-  const modalY = (height - modalHeight) / 2
-
-  ctx.fillStyle = THEME_FOREST.background
-  roundRect(ctx, modalX, modalY, modalWidth, modalHeight, 10, true)
-
-  ctx.fillStyle = THEME_FOREST.text.dark
-  ctx.font = 'bold 28px Arial'
+function drawPillButton(x, y, w, h, fill, label, textColor, scaleFactor, stroke) {
+  ctx.fillStyle = fill
+  roundRect(ctx, x, y, w, h, h / 2, true)
+  if (stroke) {
+    ctx.strokeStyle = stroke
+    ctx.lineWidth = Math.max(1, 1.5 * scaleFactor)
+    roundRect(ctx, x, y, w, h, h / 2, false, true)
+  }
+  ctx.fillStyle = textColor
+  ctx.font = `bold ${16 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText('游戏结束', width / 2, modalY + modalHeight * 0.2)
+  ctx.fillText(label, x + w / 2, y + h / 2 + 0.5)
+  return { x, y, width: w, height: h }
+}
 
-  ctx.font = '20px Arial'
-  ctx.fillText(`最终分数: ${score}`, width / 2, modalY + modalHeight * 0.35)
+function drawScoreChip(x, y, w, h, label, value, scaleFactor, valueColor) {
+  ctx.fillStyle = '#EEF3F6'
+  roundRect(ctx, x, y, w, h, 12 * scaleFactor, true)
+  ctx.fillStyle = 'rgba(43,65,98,0.55)'
+  ctx.font = `${12 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(label, x + w / 2, y + 16 * scaleFactor)
+  ctx.fillStyle = valueColor || THEME_FOREST.text.dark
+  ctx.font = `bold ${22 * scaleFactor}px 'Helvetica Neue', Arial, sans-serif`
+  ctx.fillText(String(value), x + w / 2, y + h - 20 * scaleFactor)
+}
 
-  const btnWidth = modalWidth * 0.6
-  const btnHeight = 50
-  const btnX = (width - btnWidth) / 2
-  const btnY = modalY + modalHeight * 0.55
+function renderEndCardFrame(scaleFactor, cardH) {
+  ctx.fillStyle = 'rgba(32, 26, 20, 0.42)'
+  ctx.fillRect(0, 0, width, height)
 
-  ctx.fillStyle = THEME_FOREST.tiles['64'].background
-  roundRect(ctx, btnX, btnY, btnWidth, btnHeight, 5, true)
-  ctx.fillStyle = THEME_FOREST.text.light
-  ctx.font = 'bold 20px Arial'
-  ctx.fillText('再来一次', width / 2, btnY + btnHeight / 2)
+  const cardW = Math.min(width * 0.82, 340 * scaleFactor)
+  const cardX = (width - cardW) / 2
+  const cardY = (height - cardH) / 2
+  ctx.fillStyle = '#FFFEFA'
+  ctx.shadowColor = 'rgba(80, 70, 50, 0.16)'
+  ctx.shadowBlur = 18 * scaleFactor
+  ctx.shadowOffsetY = 6 * scaleFactor
+  roundRect(ctx, cardX, cardY, cardW, cardH, 22 * scaleFactor, true)
+  ctx.shadowColor = 'transparent'
+  ctx.shadowBlur = 0
+  ctx.shadowOffsetY = 0
+  ctx.strokeStyle = 'rgba(180, 150, 110, 0.35)'
+  ctx.lineWidth = 1
+  roundRect(ctx, cardX, cardY, cardW, cardH, 22 * scaleFactor, false, true)
+  return { cardX, cardY, cardW, cardH }
+}
 
+function renderGameOverModal(scaleFactor) {
+  const hasRevive = canRevive > 0
+  const cardH = (hasRevive ? 430 : 372) * scaleFactor
+  const { cardX, cardY, cardW } = renderEndCardFrame(scaleFactor, cardH)
+
+  const birdSize = 96 * scaleFactor
+  const birdX = width / 2 - birdSize / 2
+  const birdY = cardY + 22 * scaleFactor
+  if (animalLoaded) {
+    ctx.drawImage(animalImage, birdX, birdY, birdSize, birdSize)
+  }
+
+  ctx.fillStyle = THEME_FOREST.text.dark
+  ctx.font = `bold ${24 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('游戏结束', width / 2, birdY + birdSize + 22 * scaleFactor)
+
+  const chipY = birdY + birdSize + 46 * scaleFactor
+  const chipH = 62 * scaleFactor
+  const gap = 10 * scaleFactor
+  const chipW = (cardW - 40 * scaleFactor - gap) / 2
+  const chipX = cardX + 20 * scaleFactor
+  drawScoreChip(chipX, chipY, chipW, chipH, '本局', score, scaleFactor)
+  drawScoreChip(chipX + chipW + gap, chipY, chipW, chipH, '最高', highScore, scaleFactor)
+
+  const btnW = cardW - 40 * scaleFactor
+  const btnH = 46 * scaleFactor
+  const btnX = cardX + 20 * scaleFactor
+  let btnY = chipY + chipH + 22 * scaleFactor
   const buttons = {
-    restart: { x: btnX, y: btnY, width: btnWidth, height: btnHeight }
+    restart: drawPillButton(btnX, btnY, btnW, btnH, '#4AA08C', '再来一局', '#FFFFFF', scaleFactor)
   }
-
-  if (canRevive > 0) {
-    const reviveBtnY = modalY + modalHeight * 0.75
-    ctx.fillStyle = THEME_FOREST.tiles['512'].background
-    roundRect(ctx, btnX, reviveBtnY, btnWidth, btnHeight, 5, true)
-    ctx.fillStyle = THEME_FOREST.text.dark
-    ctx.font = 'bold 20px Arial'
-    ctx.fillText(`移除一个方块复活 (${canRevive})`, width / 2, reviveBtnY + btnHeight / 2)
-    buttons.revive = { x: btnX, y: reviveBtnY, width: btnWidth, height: btnHeight }
+  if (hasRevive) {
+    btnY += btnH + 12 * scaleFactor
+    buttons.revive = drawPillButton(
+      btnX, btnY, btnW, btnH, '#F7F4EE', '移走一个格子复活', '#5E503F', scaleFactor, 'rgba(180,150,110,0.45)'
+    )
   }
-
   return buttons
+}
+
+function renderWinModal(scaleFactor) {
+  const cardH = 456 * scaleFactor
+  const { cardX, cardY, cardW } = renderEndCardFrame(scaleFactor, cardH)
+
+  const birdSize = 128 * scaleFactor
+  const birdX = width / 2 - birdSize / 2
+  const birdY = cardY + 16 * scaleFactor
+  const birdImg = tileBirdImages[WIN_TILE]
+  if (birdImg && tileBirdLoaded[WIN_TILE]) {
+    ctx.drawImage(birdImg, birdX, birdY, birdSize, birdSize)
+  } else if (animalLoaded) {
+    ctx.drawImage(animalImage, birdX, birdY, birdSize, birdSize)
+  }
+
+  const pulse = 0.65 + 0.35 * Math.sin(Date.now() / 280)
+  drawSparkle(birdX + 8 * scaleFactor, birdY + 22 * scaleFactor, 8 * scaleFactor, `rgba(240, 196, 74, ${pulse})`)
+  drawSparkle(birdX + birdSize - 6 * scaleFactor, birdY + 36 * scaleFactor, 7 * scaleFactor, `rgba(240, 196, 74, ${1.1 - pulse})`)
+  drawSparkle(width / 2 + 52 * scaleFactor, birdY + 10 * scaleFactor, 6 * scaleFactor, 'rgba(255, 232, 140, 0.9)')
+
+  ctx.fillStyle = '#C9A227'
+  ctx.font = `bold ${26 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('小鸟之王', width / 2, birdY + birdSize + 18 * scaleFactor)
+
+  ctx.fillStyle = 'rgba(43,65,98,0.55)'
+  ctx.font = `${15 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.fillText('合成 4096！', width / 2, birdY + birdSize + 44 * scaleFactor)
+
+  ctx.fillStyle = '#E8894A'
+  ctx.font = `bold ${18 * scaleFactor}px 'PingFang SC', 'Helvetica Neue', Arial, sans-serif`
+  ctx.fillText(`本局 ${score}`, width / 2, birdY + birdSize + 74 * scaleFactor)
+
+  const btnW = cardW - 40 * scaleFactor
+  const btnH = 46 * scaleFactor
+  const btnX = cardX + 20 * scaleFactor
+  const continueY = birdY + birdSize + 100 * scaleFactor
+  const restartY = continueY + btnH + 12 * scaleFactor
+  return {
+    continue: drawPillButton(btnX, continueY, btnW, btnH, '#4AA08C', '继续玩', '#FFFFFF', scaleFactor),
+    restart: drawPillButton(
+      btnX, restartY, btnW, btnH, '#FFFEFA', '再来一局', '#5E503F', scaleFactor, 'rgba(180,150,110,0.5)'
+    )
+  }
 }
 
 function pointInRect(x, y, rect) {
@@ -1559,12 +1697,25 @@ function handleTap(endX, endY) {
     return true
   }
 
-  if (pointInRect(endX, endY, hudRankBtn)) {
+  if (pointInRect(endX, endY, hudRankBtn) && !gameOver && !showWinModal) {
     openRankPanel()
     return true
   }
 
   const uiElements = render()
+
+  if (showWinModal && currentRestartBtn) {
+    if (pointInRect(endX, endY, currentRestartBtn.continue)) {
+      showWinModal = false
+      render()
+      return true
+    }
+    if (pointInRect(endX, endY, currentRestartBtn.restart)) {
+      init()
+      return true
+    }
+    return true
+  }
 
   if (gameOver && currentRestartBtn) {
     if (pointInRect(endX, endY, currentRestartBtn.restart)) {
@@ -1669,7 +1820,7 @@ wx.onTouchStart(startEvent => {
   hasMoved = false
   currentSwipe = { direction: 'none', progress: 0 }
   hudPressed = null
-  if (!showSettings && !showRestartConfirm && !showRank) {
+  if (!showSettings && !showRestartConfirm && !showRank && !gameOver && !showWinModal) {
     if (!gameOver && pointInRect(startX, startY, hudRestartBtn)) hudPressed = 'restart'
     else if (!gameOver && pointInRect(startX, startY, hudSettingsBtn)) hudPressed = 'settings'
     else if (pointInRect(startX, startY, hudRankBtn)) {
@@ -1681,7 +1832,7 @@ wx.onTouchStart(startEvent => {
 })
 
 wx.onTouchMove(moveEvent => {
-  if (animating || reviveMode || gameOver || showSettings || showRestartConfirm || showRank) return
+  if (animating || reviveMode || gameOver || showWinModal || showSettings || showRestartConfirm || showRank) return
 
   const now = Date.now()
   const moveX = moveEvent.touches[0].clientX - startX
@@ -1749,7 +1900,7 @@ wx.onTouchEnd(endEvent => {
     return
   }
 
-  if (gameOver || showSettings || showRestartConfirm || showRank) {
+  if (gameOver || showWinModal || showSettings || showRestartConfirm || showRank) {
     handleTap(endX, endY)
     return
   }
@@ -1879,7 +2030,10 @@ function checkGameStatus() {
     if (maxTile >= milestone) reachedMilestones.add(milestone)
   }
 
-  if (maxTile >= 2048) gameWon = true
+  if (maxTile >= WIN_TILE) {
+    if (!gameWon) showWinModal = true
+    gameWon = true
+  }
 
   if (isGameOver()) {
     gameOver = true
@@ -2354,7 +2508,7 @@ function startMainLoop() {
       render()
       return
     }
-    if (showRank || !gameOver && !reviveMode) {
+    if (showRank || showWinModal || !gameOver && !reviveMode) {
       if (Date.now() - lastRenderTime > 32) {
         lastRenderTime = Date.now()
         render()
@@ -2371,7 +2525,7 @@ function getShareTitle() {
   if (highScore > 0) {
     return `合合小鸟最高分 ${highScore}，来挑战一下？`
   }
-  return '合合小鸟，一起把格子合成 2048！'
+  return '合合小鸟，一起把格子合成 4096！'
 }
 
 function getSharePayload() {

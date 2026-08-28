@@ -3,7 +3,7 @@
 This file is the shared behavioral source of truth for the WeChat Mini Game and
 native iOS versions.
 
-Mini Game 1.4.1 implements the rules below. iOS may lag until it is updated;
+Mini Game 1.5.0 implements the rules below. iOS may lag until it is updated;
 document any platform deviation before changing implementation code.
 
 ## Board
@@ -42,14 +42,14 @@ document any platform deviation before changing implementation code.
 ## Milestones
 
 - Reaching 512, 1024, or 2048 is tracked internally for later features.
-- The Mini Game does not show a top banner for milestones; play continues
+- The Mini Game does not show a top banner for 512 / 1024 / 2048; play continues
   without an extra tap.
-- Winning does not stop the game unless the platform UI explicitly chooses
-  to show a blocking win state.
 
 ## Win and Loss
 
-- The player wins when a `2048` tile appears.
+- The Mini Game treats `4096` as the final win. The first time that tile appears
+  in a run, it shows a blocking celebration; the player can continue or restart.
+- Reaching `2048` is a milestone only and does not stop the game.
 - The game is over when the board has no empty cells and no adjacent equal cells
   horizontally or vertically.
 
@@ -66,7 +66,7 @@ document any platform deviation before changing implementation code.
 
 ## Ranking
 
-Ranking is Mini Game only for 1.4.0. iOS should not copy this until a native design exists.
+Ranking is Mini Game only for 1.5.0. iOS should not copy this until a native design exists.
 
 - Boards: daily and all-time.
 - Local bird challengers (菜鸟 / 勤鸟 / 老鸟) always appear.

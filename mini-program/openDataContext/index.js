@@ -197,52 +197,111 @@ function drawList(rows, logicalW, logicalH, scale) {
   ctx.restore()
 }
 
-function mergeRows(msg, friends, me) {
-  const rows = msg.npcs.map(npc => ({ ...npc, kind: 'npc', isSelf: false }))
-  const myAvatar = me && (me.avatarUrl || me.avatar)
-  const myName = (me && (me.nickName || me.nickname)) || ''
+function pickName(item) {
+  return (item && (item.nickName || item.nickname)) || ''
+}
 
-  let selfSeen = false
+function pickOpenId(item) {
+  return (item && (item.openId || item.openid)) || ''
+}
+
+function pickAvatar(item) {
+  return (item && (item.avatarUrl || item.avatar)) || ''
+}
+
+function normalizeAvatar(url) {
+  if (!url) return ''
+  return String(url).replace(/^https?:/i, '').replace(/\/\d+$/, '').split('?')[0]
+}
+
+function kvFingerprint(item) {
+  return `${kv(item, KEY_BEST)}|${kv(item, KEY_DAILY)}`
+}
+
+function isSelfFriend(item, me, myKvFp) {
+  if (!item) return false
+  const oid = pickOpenId(item)
+  const myOid = pickOpenId(me)
+  if (oid && myOid && oid === myOid) return true
+  const av = normalizeAvatar(pickAvatar(item))
+  const myAv = normalizeAvatar(pickAvatar(me))
+  if (av && myAv && av === myAv) return true
+  const name = pickName(item)
+  const myName = pickName(me)
+  if (name && myName && name === myName) return true
+  if (myKvFp && kvFingerprint(item) === myKvFp) return true
+  return false
+}
+
+function mergeRows(msg, friends, me, myKvFp) {
+  const rows = msg.npcs.map(npc => ({ ...npc, kind: 'npc', isSelf: false }))
+  let selfRow = null
+
   ;(friends || []).forEach(item => {
     const score = friendScore(item, msg.tab, msg.today)
-    const isSelf = !!(myAvatar && item.avatarUrl && item.avatarUrl === myAvatar) ||
-      !!(myName && item.nickname === myName)
-    if (isSelf) selfSeen = true
-    if (score <= 0 && !isSelf) return
-    rows.push({
-      name: isSelf ? (item.nickname || '我') : (item.nickname || '好友'),
-      score: isSelf ? Math.max(score, msg.playerScore || 0) : score,
-      kind: isSelf ? 'self' : 'friend',
-      isSelf,
-      avatar: item.avatarUrl,
+    const self = isSelfFriend(item, me, myKvFp)
+    if (score <= 0 && !self) return
+    const row = {
+      name: self ? (pickName(item) || pickName(me) || '我') : (pickName(item) || '好友'),
+      score: self ? Math.max(score, msg.playerScore || 0) : score,
+      kind: self ? 'self' : 'friend',
+      isSelf: self,
+      avatar: pickAvatar(item) || (self ? pickAvatar(me) : ''),
       beaten: false
-    })
+    }
+    if (self) {
+      if (!selfRow) {
+        selfRow = row
+      } else {
+        selfRow.score = Math.max(selfRow.score, row.score)
+        if (selfRow.name === '我' && row.name) selfRow.name = row.name
+        if (!selfRow.avatar && row.avatar) selfRow.avatar = row.avatar
+      }
+      return
+    }
+    rows.push(row)
   })
 
-  if (!selfSeen) {
-    rows.push({
-      name: '我',
+  if (!selfRow) {
+    selfRow = {
+      name: pickName(me) || '我',
       score: msg.playerScore || 0,
       kind: 'self',
       isSelf: true,
-      avatar: myAvatar,
+      avatar: pickAvatar(me),
       beaten: false
-    })
+    }
+  } else {
+    selfRow.score = Math.max(selfRow.score, msg.playerScore || 0)
   }
+  rows.push(selfRow)
 
   rows.sort((a, b) => b.score - a.score || (a.isSelf ? -1 : 1))
   return rows
 }
 
 function loadMe(callback) {
+  const withKv = me => {
+    if (typeof wx.getUserCloudStorage !== 'function') {
+      callback(me, '')
+      return
+    }
+    wx.getUserCloudStorage({
+      keyList: [KEY_BEST, KEY_DAILY],
+      success: res => callback(me, kvFingerprint({ KVDataList: res.KVDataList || [] })),
+      fail: () => callback(me, '')
+    })
+  }
+
   if (typeof wx.getUserInfo !== 'function') {
-    callback(null)
+    withKv(null)
     return
   }
   wx.getUserInfo({
-    openIdList: ['self'],
-    success: res => callback((res.data && res.data[0]) || null),
-    fail: () => callback(null)
+    openIdList: ['selfOpenId'],
+    lang: 'zh_CN',
+    success: res => withKv((res.data && res.data[0]) || null),
+    fail: () => withKv(null)
   })
 }
 
@@ -254,21 +313,21 @@ function render(msg) {
   sharedCanvas.width = Math.max(1, Math.floor(logicalW * scale))
   sharedCanvas.height = Math.max(1, Math.floor(logicalH * scale))
 
-  const paint = (friends, me) => {
-    const rows = mergeRows(msg, friends, me)
+  const paint = (friends, me, myKvFp) => {
+    const rows = mergeRows(msg, friends, me, myKvFp)
     drawList(rows, logicalW, logicalH, scale)
     rows.forEach(row => {
       if (row.avatar) loadAvatar(row.avatar, () => drawList(rows, logicalW, logicalH, scale))
     })
   }
 
-  loadMe(me => {
-    paint([], me)
+  loadMe((me, myKvFp) => {
+    paint([], me, myKvFp)
     if (!msg.showFriends || typeof wx.getFriendCloudStorage !== 'function') return
     wx.getFriendCloudStorage({
       keyList: [KEY_BEST, KEY_DAILY],
-      success: res => paint(res.data || [], me),
-      fail: () => paint([], me)
+      success: res => paint(res.data || [], me, myKvFp),
+      fail: () => paint([], me, myKvFp)
     })
   })
 }
